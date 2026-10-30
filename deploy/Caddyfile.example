@@ -1,20 +1,29 @@
-# 将示例域名替换为你自己的域名，并配置 DNS A/AAAA 记录。
+# 合并到已有 Caddyfile；面板内可根据已保存地址与 XHTTP 路径生成完整片段。
 panel.example.com {
     reverse_proxy 127.0.0.1:8080
 }
-
-connect.example.com {
+sub.example.com {
     reverse_proxy 127.0.0.1:8081
 }
-
-# 当代理协议使用公网 TCP 443 时，请把 Caddy 放在不同 IP / 主机，
-# 或为代理入口选择其他端口。不要让两者竞争同一个监听地址。
-# HTTP-01 的 node.example.com 验证可单独配置：
-http://node.example.com {
-    handle /.well-known/acme-challenge/* {
-        reverse_proxy 127.0.0.1:8081
+# 可选：外部 TLS 的 VLESS XHTTP。替换路径与本机端口，保留请求路径。
+node.example.com {
+    @xhttp path /replace-with-entry-path /replace-with-entry-path/*
+    handle @xhttp {
+        reverse_proxy 127.0.0.1:23456 {
+            flush_interval -1
+        }
     }
     handle {
-        reverse_proxy 127.0.0.1:8081
+        respond 404
     }
 }
+# REALITY / AnyTLS / Hysteria2 仍直连 Mihomo 的随机 TCP/UDP 端口。
+# 仅在由面板签发 HTTP-01 证书时，将该规则合并到对应域名现有 HTTP 站点。
+# http://node.example.com {
+#     handle /.well-known/acme-challenge/* {
+#         reverse_proxy 127.0.0.1:8081
+#     }
+#     handle {
+#         redir https://{host}{uri} 308
+#     }
+# }

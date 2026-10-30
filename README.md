@@ -41,7 +41,7 @@ PrismFlow 面向个人与小团队的单台 VPS，使用 **Go + SQLite**，将 R
 | --- | --- |
 | 协议编排 | 四种常用预设快速创建，携带参数切换到普通表单；自动生成五位端口并检查冲突 |
 | 内核管理 | 下载并管理 Mihomo；面板自身支持稳定版检测和手动 / 自动更新；保存配置后自动应用 |
-| 域名与证书 | 统一域名；选择系统证书路径、acme.sh、内置 ACME 或 PEM，支持申请和续期 |
+| 域名与证书 | 分开设置面板、订阅与节点地址；生成反代配置；复用系统证书或 ACME 签发，展示 SAN 覆盖范围 |
 | 用户与订阅 | 为用户选择可用入口，生成 Mihomo YAML、分享链接与二维码；节点名称带用户名前缀 |
 | 连通性检测 | 分步检查入口，用隔离客户端发起真实协议请求，不重载在线内核，无直连回退 |
 | 流量与网站 | 代理流量图表、服务器周期额度与订阅 Header；可选启用静态伪装网站及 Hysteria2 回落 |
@@ -52,7 +52,7 @@ PrismFlow 面向个人与小团队的单台 VPS，使用 **Go + SQLite**，将 R
 | 快速预设 | 传输 | 所需信息 |
 | --- | --- | --- |
 | VLESS + REALITY + Vision | TCP | 服务器地址、合适的握手目标；无需自有证书 |
-| VLESS + XHTTP + TLS | XHTTP | 服务器地址、TLS 证书 |
+| VLESS + XHTTP + TLS | XHTTP | 节点地址；反代维护 TLS，或绑定内核证书 |
 | AnyTLS | TCP | 服务器地址、TLS 证书 |
 | Hysteria2 | QUIC / UDP | 服务器地址、TLS 证书、可用 UDP |
 
@@ -167,9 +167,9 @@ ssh -N -L 8080:127.0.0.1:8080 your-user@your-server
 ```
 
 1. **初始化管理员**：填写安装步骤读取的 `setup.token`，设置用户名与至少 12 字节的密码。初始化成功后令牌文件自动删除。
-2. **准备内核与证书**：在「系统设置」安装内核；在「域名与证书」设置统一域名，按协议需要选择证书。REALITY 可跳过自有证书。
+2. **准备内核与证书**：在「系统设置」安装内核；在「域名与证书」设置面板、订阅和节点地址；REALITY 与外部 TLS 的 XHTTP 无需绑定内核证书。
 3. **创建入口并分配用户**：使用快速或普通创建，再为用户选择协议。托管入口没有启用的关联用户时不监听。
-4. **配置公开订阅地址**：填写公开 HTTPS 根地址，在用户列表打开订阅弹窗，复制链接或扫描二维码导入客户端。
+4. **配置公开订阅地址**：将订阅域名反代至 8081，保存公开 HTTPS 根地址，在用户列表打开订阅弹窗，复制链接或扫描二维码导入客户端。
 5. **验证连接**：使用入口检测，再在实际客户端确认公网可达性；按需设置流量周期与伪装网站。
 
 ### 对外访问与端口
@@ -181,7 +181,7 @@ ssh -N -L 8080:127.0.0.1:8080 your-user@your-server
 | `127.0.0.1:9097` | Mihomo 控制器 | 仅本机使用 |
 | 随机五位端口 | 代理协议入口 | 按协议开放 TCP / UDP |
 
-反向代理示例见 [Caddyfile](deploy/Caddyfile.example)。管理域名和公开订阅域名分开；使用 HTTPS 管理域名时设置 `PRISMFLOW_ORIGIN=https://panel.example.com`。
+已有 Caddy / Nginx 可继续负责网页 HTTPS。面板内「公网访问设置」按管理、订阅和节点分工生成反代配置；XHTTP 可经反代使用公网 443，其他协议保持直连随机端口。保存不会批量改动已有节点。详见 [域名、反代与证书](docs/DOMAINS.md) 和 [Caddy 示例](deploy/Caddyfile.example)。
 
 > [!IMPORTANT]
 > 网站与订阅的公开域名应指向 **8081**，不是管理端 **8080**。控制器 **9097** 保持回环监听。代理入口与反向代理也不能竞争同一监听地址和端口。
@@ -220,13 +220,13 @@ Docker 命令需在 `/opt/prismflow` 中先设置 `export PRISMFLOW_IMAGE="$(cat
 | `PRISMFLOW_PUBLIC_LISTEN` | `127.0.0.1:8081` | 公开服务监听地址 |
 | `PRISMFLOW_CONTROLLER` | `127.0.0.1:9097` | 控制器，仅支持回环 IP |
 | `PRISMFLOW_CORE` | `mihomo` | 初始内核路径，数据目录中的受管内核优先；Windows 默认 `mihomo.exe` |
-| `PRISMFLOW_ORIGIN` | 空 | HTTPS 反代后的管理源地址 |
+| `PRISMFLOW_ORIGIN` | 空 | 管理源地址；非空时优先于面板保存的公网地址 |
 | `PRISMFLOW_TLS_CERT` / `PRISMFLOW_TLS_KEY` | 空 | 可选管理 HTTPS 证书，须成对设置 |
 | `PRISMFLOW_ACME_SH` | 空 | 可选已有 acme.sh 的绝对路径 |
 
 证书支持系统路径、acme.sh、内置 ACME 与 PEM。系统路径仅读取原文件，并检测文件变更；服务账户需有读取权限，systemd 的 `ProtectHome` 默认限制 home 目录。
 
-HTTP-01 需要域名解析正确，并将公网 TCP 80 的 `/.well-known/acme-challenge/` 转发到公开服务；Cloudflare DNS-01 需要相应 Zone 的读取和 DNS 编辑权限。首版只支持单域名，不开放通配符。
+HTTP-01 需要域名解析正确，并将公网 TCP 80 的 `/.well-known/acme-challenge/` 转发到公开服务；Cloudflare DNS-01 需要相应 Zone 的读取和 DNS 编辑权限。支持单域名和泛域名；泛域名仅使用 DNS-01。已有反代证书可按系统路径复用，原工具继续续期。
 
 申请页默认使用测试 CA，其证书不受普通客户端信任；正式使用须取消测试环境。代理证书与管理面板 HTTPS 证书分别管理。
 
@@ -236,6 +236,7 @@ HTTP-01 需要域名解析正确，并将公网 TCP 80 的 `/.well-known/acme-ch
 
 | 文档 | 内容 |
 | --- | --- |
+| [域名、反代与证书](docs/DOMAINS.md) | 三类公网地址、TLS 分工、证书复用与部署检查 |
 | [协议说明](docs/PROTOCOLS.md) | 协议组合、原生监听器、REALITY 目标与订阅 |
 | [发布与更新](docs/UPDATES.md) | 一键部署、版本检查、自动更新与 Tag 发布 |
 | [功能使用指南](docs/USAGE.md) | 网站启停、真实连接检测、流量周期与订阅 Header |

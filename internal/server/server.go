@@ -153,6 +153,7 @@ func (s *Server) mutate(fn func(*model.State) error) error {
 }
 func (s *Server) AdminHandler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /.well-known/prismflow-access", accessMarker("panel"))
 	mux.HandleFunc("GET /api/status", s.status)
 	mux.HandleFunc("POST /api/setup", s.setup)
 	mux.HandleFunc("POST /api/session", s.login)
@@ -187,6 +188,8 @@ func (s *Server) AdminHandler() http.Handler {
 	api.HandleFunc("GET /api/certificates/files", s.certificateFiles)
 	api.HandleFunc("GET /api/events", s.events)
 	api.HandleFunc("GET /api/metrics", s.history)
+	api.HandleFunc("GET /api/access/config", s.accessConfig)
+	api.HandleFunc("POST /api/access/check", s.checkAccess)
 	api.HandleFunc("PUT /api/settings", s.settings)
 	api.HandleFunc("POST /api/certificates/import", s.importCertificate)
 	api.HandleFunc("POST /api/certificates/issue", s.issueCertificate)
@@ -224,6 +227,7 @@ func (s *Server) AdminHandler() http.Handler {
 func (s *Server) PublicHandler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /.well-known/acme-challenge/{token}", s.Certificates.Challenge)
+	mux.HandleFunc("GET /.well-known/prismflow-access", accessMarker("public"))
 	mux.HandleFunc("GET /s/{token}", s.subscription)
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 		website.Serve(w, r, s.State().Website, filepath.Join(s.Options.DataDir, "sites"))

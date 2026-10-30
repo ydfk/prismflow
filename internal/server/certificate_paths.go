@@ -49,7 +49,7 @@ func (s *Server) loadCertificateFiles(st *model.State) error {
 		if err != nil {
 			return err
 		}
-		if err = cert.VerifyHostname(c.Domain); err != nil {
+		if err = core.CertificateCovers(cert, c.Domain); err != nil {
 			return errors.New("证书域名不匹配")
 		}
 		c.PEM = pem

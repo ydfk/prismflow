@@ -17,7 +17,7 @@ for ARCH in amd64 arm64; do
   printf '%s\n' "$VERSION" > "$DEST/VERSION"
   cp third_party/dependencies.txt "$DEST/third_party/"
   cp third_party/mihomo/LICENSE "$DEST/third_party/mihomo/"
-  cp docs/PROTOCOLS.md docs/VERIFICATION.md docs/USAGE.md docs/UPDATES.md "$DEST/docs/"
+  cp docs/PROTOCOLS.md docs/VERIFICATION.md docs/USAGE.md docs/UPDATES.md docs/DOMAINS.md "$DEST/docs/"
   cp docs/screenshots/*.png "$DEST/docs/screenshots/"
   tar -C dist -czf "$DEST.tar.gz" "prismflow-linux-$ARCH"
 done

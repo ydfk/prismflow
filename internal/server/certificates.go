@@ -7,6 +7,7 @@ import (
 	"prismflow/internal/core"
 	"prismflow/internal/model"
 	"slices"
+	"strings"
 	"time"
 )
 
@@ -30,7 +31,7 @@ func (s *Server) importCertificate(w http.ResponseWriter, r *http.Request) {
 	}
 	cert, err := core.ParseCertificate(body.PEM, body.Key)
 	if err == nil {
-		err = cert.VerifyHostname(body.Domain)
+		err = core.CertificateCovers(cert, body.Domain)
 	}
 	if err != nil {
 		fail(w, 400, errors.New("证书无效、尚未生效或与域名不匹配"))
@@ -69,7 +70,7 @@ func (s *Server) issueCertificate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_, emailErr := mail.ParseAddress(body.Email)
-	if !body.Agree || emailErr != nil || !core.ValidHost(body.Domain) || !slices.Contains([]string{"http", "cloudflare"}, body.Method) {
+	if !body.Agree || emailErr != nil || !core.ValidCertificateDomain(body.Domain) || strings.HasPrefix(body.Domain, "*.") && body.Method != "cloudflare" || !slices.Contains([]string{"http", "cloudflare"}, body.Method) {
 		fail(w, 400, errors.New("请填写合法域名、邮箱、验证方式，并同意 ACME 服务条款"))
 		return
 	}
@@ -167,12 +168,15 @@ func (s *Server) startIssue(c model.Certificate) (Job, error) {
 func (s *Server) deleteCertificate(w http.ResponseWriter, r *http.Request) {
 	mutationResult(w, s.mutate(func(st *model.State) error {
 		for _, e := range st.Endpoints {
-			if e.CertificateID == r.PathValue("id") {
+			if e.Security == "tls" && !e.Native && !e.ExternalTLS() && e.CertificateID == r.PathValue("id") {
 				return errors.New("证书仍被入口引用")
 			}
 		}
 		n := len(st.Certificates)
-		if st.DefaultCertificateID==r.PathValue("id"){st.DefaultCertificateID=""}; st.Certificates = slices.DeleteFunc(st.Certificates, func(c model.Certificate) bool { return c.ID == r.PathValue("id") })
+		if st.DefaultCertificateID == r.PathValue("id") {
+			st.DefaultCertificateID = ""
+		}
+		st.Certificates = slices.DeleteFunc(st.Certificates, func(c model.Certificate) bool { return c.ID == r.PathValue("id") })
 		if len(st.Certificates) == n {
 			return errors.New("证书不存在")
 		}

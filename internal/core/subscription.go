@@ -13,7 +13,7 @@ import (
 )
 
 func Proxy(e model.Endpoint, u model.User) map[string]any {
-	p := map[string]any{"name": SubscriptionName(e, u), "type": e.Protocol, "server": e.Host, "port": e.Port, "udp": true}
+	p := map[string]any{"name": SubscriptionName(e, u), "type": e.Protocol, "server": e.Host, "port": e.ClientPort(), "udp": true}
 	name := e.ServerName
 	if name == "" {
 		name = e.Host
@@ -75,13 +75,13 @@ func Subscription(s model.State, u model.User) ([]byte, error) {
 	return yaml.Marshal(map[string]any{"mixed-port": 7890, "allow-lan": false, "mode": "rule", "proxies": p, "proxy-groups": []any{map[string]any{"name": "PrismFlow", "type": "select", "proxies": names}}, "rules": []string{"MATCH,PrismFlow"}})
 }
 func Share(e model.Endpoint, u model.User) string {
-	server := net.JoinHostPort(e.Host, strconv.Itoa(e.Port))
+	server := net.JoinHostPort(e.Host, strconv.Itoa(e.ClientPort()))
 	name := e.ServerName
 	if name == "" {
 		name = e.Host
 	}
 	if e.Protocol == "vmess" {
-		v := map[string]any{"v": "2", "ps": SubscriptionName(e, u), "add": e.Host, "port": strconv.Itoa(e.Port), "id": u.UUID, "aid": "0", "scy": "auto", "net": e.Transport, "type": "none", "host": name, "path": e.Path, "tls": "tls", "sni": name}
+		v := map[string]any{"v": "2", "ps": SubscriptionName(e, u), "add": e.Host, "port": strconv.Itoa(e.ClientPort()), "id": u.UUID, "aid": "0", "scy": "auto", "net": e.Transport, "type": "none", "host": name, "path": e.Path, "tls": "tls", "sni": name}
 		b, _ := json.Marshal(v)
 		return "vmess://" + base64.StdEncoding.EncodeToString(b)
 	}

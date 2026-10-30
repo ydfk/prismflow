@@ -24,6 +24,9 @@ func (s *Server) getState(w http.ResponseWriter, r *http.Request) {
 		state.Users[i].Token = ""
 	}
 	for i := range state.Certificates {
+		if cert, err := core.ParseCertificate(state.Certificates[i].PEM, state.Certificates[i].Key); err == nil {
+			state.Certificates[i].Names = core.CertificateNames(cert)
+		}
 		state.Certificates[i].Key = ""
 		state.Certificates[i].PEM = ""
 		state.Certificates[i].DNSSecret = ""
@@ -250,19 +253,29 @@ func (s *Server) subscription(w http.ResponseWriter, r *http.Request) {
 }
 func (s *Server) settings(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		PublicURL            string                 `json:"publicUrl"`
-		RetentionDays        int                    `json:"retentionDays"`
+		PublicURL            *string                `json:"publicUrl"`
+		RetentionDays        *int                   `json:"retentionDays"`
 		DefaultHost          *string                `json:"defaultHost"`
 		DefaultCertificateID *string                `json:"defaultCertificateId"`
 		ApplyHost            bool                   `json:"applyHost"`
 		Traffic              *model.TrafficSettings `json:"traffic"`
+		Access               *model.AccessSettings  `json:"access"`
 	}
 	if !decode(w, r, &body) {
 		return
 	}
 	mutationResult(w, s.mutate(func(st *model.State) error {
-		st.PublicURL = strings.TrimRight(body.PublicURL, "/")
-		st.RetentionDays = body.RetentionDays
+		if body.PublicURL != nil {
+			st.PublicURL = strings.TrimRight(strings.TrimSpace(*body.PublicURL), "/")
+		}
+		if body.RetentionDays != nil {
+			st.RetentionDays = *body.RetentionDays
+		}
+		if body.Access != nil {
+			st.Access = *body.Access
+			st.Access.BaseDomain = strings.TrimSpace(st.Access.BaseDomain)
+			st.Access.PanelURL = strings.TrimRight(strings.TrimSpace(st.Access.PanelURL), "/")
+		}
 		if body.Traffic != nil {
 			st.Traffic = body.Traffic.Normalized()
 		}
@@ -274,11 +287,17 @@ func (s *Server) settings(w http.ResponseWriter, r *http.Request) {
 			if body.ApplyHost && st.DefaultHost != "" {
 				for i := range st.Endpoints {
 					st.Endpoints[i].Host = st.DefaultHost
-					if st.Endpoints[i].Security == "tls" && st.DefaultCertificateID != "" {
+					if st.Endpoints[i].ExternalTLS() {
+						st.Endpoints[i].ServerName = st.DefaultHost
+					}
+					if st.Endpoints[i].Security == "tls" && !st.Endpoints[i].ExternalTLS() && st.DefaultCertificateID != "" {
 						st.Endpoints[i].CertificateID = st.DefaultCertificateID
 						for _, cert := range st.Certificates {
 							if cert.ID == st.DefaultCertificateID {
 								st.Endpoints[i].ServerName = cert.Domain
+								if strings.HasPrefix(cert.Domain, "*.") {
+									st.Endpoints[i].ServerName = st.DefaultHost
+								}
 							}
 						}
 					}

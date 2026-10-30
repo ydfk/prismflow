@@ -20,6 +20,7 @@ import (
 	"prismflow/internal/core"
 	"prismflow/internal/model"
 	"prismflow/internal/store"
+	"strings"
 	"sync"
 	"time"
 )
@@ -66,7 +67,7 @@ func (m *Manager) Challenge(w http.ResponseWriter, r *http.Request) {
 func (m *Manager) Issue(c model.Certificate) (model.Certificate, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if !core.ValidHost(c.Domain) || c.Email == "" {
+	if !core.ValidCertificateDomain(c.Domain) || strings.HasPrefix(c.Domain, "*.") && c.Method != "cloudflare" || c.Email == "" {
 		return c, errors.New("请输入域名和 ACME 联系邮箱")
 	}
 	if c.Engine == "acmesh" {
@@ -143,6 +144,9 @@ func (m *Manager) Issue(c model.Certificate) (model.Certificate, error) {
 	cert, err := core.ParseCertificate(string(resource.Certificate), string(resource.PrivateKey))
 	if err != nil {
 		return c, err
+	}
+	if err = core.CertificateCovers(cert, c.Domain); err != nil {
+		return c, errors.New("签发证书未覆盖申请域名")
 	}
 	c.PEM = string(resource.Certificate)
 	c.Key = string(resource.PrivateKey)

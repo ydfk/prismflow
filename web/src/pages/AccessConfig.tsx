@@ -1,0 +1,13 @@
+import { useEffect, useState } from 'react'
+import { Clipboard, Stethoscope } from 'lucide-react'
+import { api } from '../api'
+import Modal from '../Modal'
+import { Button, Notice } from '../ui'
+type Config={caddy:string;nginx:string;environment:string;warnings:string[];direct:string[]}
+type Check={role:string;address:string;ok:boolean;message:string;ips:string[]}
+export default function AccessConfig({revision,onClose}:{revision:number;onClose:()=>void}){
+ const [config,setConfig]=useState<Config>();const [format,setFormat]=useState<'caddy'|'nginx'|'environment'>('caddy')
+ const [checks,setChecks]=useState<Check[]>();const [error,setError]=useState('');const [busy,setBusy]=useState(false);const [copied,setCopied]=useState(false)
+ useEffect(()=>{let active=true;api<Config>('/access/config').then(c=>{if(active)setConfig(c)}).catch(e=>{if(active)setError(e.message)});return()=>{active=false}},[revision])
+ return <Modal title="反代配置与部署检查" onClose={onClose} wide><p className="access-config-intro">根据已保存的地址生成。将所需规则合并到现有反代；Nginx 请替换证书路径。不会改写服务器文件。</p><div className="toolbar"><div className="button-wrap">{(['caddy','nginx','environment'] as const).map(f=><Button key={f} className={format===f?'primary':''} onClick={()=>{setFormat(f);setCopied(false)}}>{f==='environment'?'服务环境':f==='caddy'?'Caddy':'Nginx'}</Button>)}</div><Button disabled={!config} onClick={async()=>{try{await navigator.clipboard.writeText(config![format]);setCopied(true)}catch{setError('复制失败，请手动选择配置文本')}}}><Clipboard size={14}/>{copied?'已复制':'复制配置'}</Button></div>{error&&<Notice error>{error}</Notice>}{config?<><pre className="access-code" tabIndex={0} aria-label={`${format} 配置`}>{config[format]||'先保存面板、订阅或外部 TLS 节点地址，再生成配置。'}</pre>{config.warnings.map((w,i)=><Notice key={i}>{w}</Notice>)}{config.direct.length>0&&<details><summary>直连入口 · 单独放行端口</summary><ul className="access-direct">{config.direct.map(e=><li key={e}>{e}</li>)}</ul></details>}</>:<p role="status">正在生成配置…</p>}<div className="form-actions"><Button busy={busy} onClick={async()=>{setBusy(true);setError('');try{setChecks(await api<Check[]>('/access/check','POST',{}))}catch(e){setError((e as Error).message)}finally{setBusy(false)}}}><Stethoscope size={15}/>检查公网访问</Button></div>{checks&&<div className="access-checks" aria-live="polite">{checks.map(c=><div key={c.role}><strong>{c.role==='panel'?'管理面板':'订阅与网站'} · {c.ok?'正常':'待处理'}</strong><small>{c.address||'尚未设置地址'}</small><p>{c.message}</p>{c.ips.length>0&&<small>DNS：{c.ips.join('、')}</small>}</div>)}</div>}<p className="footnote">先在服务器校验并重载反代配置，再检查。检测仅反映服务器视角，节点协议请在入口列表单独检测。</p></Modal>
+}

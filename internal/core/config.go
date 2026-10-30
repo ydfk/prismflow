@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"gopkg.in/yaml.v3"
 	"net"
-	"net/url"
+
 	"prismflow/internal/model"
 	"regexp"
 	"slices"
@@ -34,6 +34,9 @@ func Validate(s model.State, reserved []int) error {
 			}
 		}
 	}
+	if err := ValidateAccess(s); err != nil {
+		return err
+	}
 	if s.DefaultHost != "" && !ValidHost(s.DefaultHost) {
 		return errors.New("默认域名或地址无效")
 	}
@@ -54,11 +57,8 @@ func Validate(s model.State, reserved []int) error {
 	if s.RetentionDays < 1 || s.RetentionDays > 365 {
 		return errors.New("历史保留天数必须在 1–365 之间")
 	}
-	if s.PublicURL != "" {
-		u, err := url.Parse(s.PublicURL)
-		if err != nil || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Path != "" && u.Path != "/" || (u.Scheme != "https" && !(u.Scheme == "http" && (u.Hostname() == "localhost" || net.ParseIP(u.Hostname()).IsLoopback()))) {
-			return errors.New("订阅地址须为 HTTPS 根地址；仅本机可用 HTTP")
-		}
+	if s.PublicURL != "" && !ValidPublicURL(s.PublicURL) {
+		return errors.New("订阅地址须为 HTTPS 根地址；仅本机可用 HTTP")
 	}
 	certs := map[string]model.Certificate{}
 	ids := map[string]bool{}
@@ -117,6 +117,7 @@ func Validate(s model.State, reserved []int) error {
 		if e.Transport == "grpc" && (!safeID.MatchString(e.Path)) {
 			return errors.New("gRPC 服务名仅允许字母、数字、连字符、下划线")
 		}
+
 		if e.Security == "reality" {
 			if e.Transport != "tcp" {
 				return errors.New("第一版 REALITY 仅开放 TCP + Vision 组合")
@@ -135,7 +136,7 @@ func Validate(s model.State, reserved []int) error {
 				return errors.New("REALITY 密钥对不匹配")
 			}
 		}
-		if e.Security == "tls" {
+		if e.Security == "tls" && !e.ExternalTLS() {
 			c, ok := certs[e.CertificateID]
 			if !ok {
 				return fmt.Errorf("%s：请选择证书", e.Name)
@@ -247,7 +248,7 @@ func Render(s model.State, controller, secret, websiteURL string) ([]byte, error
 		if len(assigned) == 0 {
 			continue
 		}
-		l := map[string]any{"name": "pf-" + e.ID, "type": e.Protocol, "listen": "0.0.0.0", "port": e.Port}
+		l := map[string]any{"name": "pf-" + e.ID, "type": e.Protocol, "listen": e.ListenHost(), "port": e.Port}
 		switch e.Protocol {
 		case "shadowsocks":
 			l["cipher"] = "chacha20-ietf-poly1305"
@@ -279,7 +280,7 @@ func Render(s model.State, controller, secret, websiteURL string) ([]byte, error
 			}
 			l["users"] = users
 		}
-		if e.Security == "tls" {
+		if e.Security == "tls" && !e.ExternalTLS() {
 			for _, c := range s.Certificates {
 				if c.ID == e.CertificateID {
 					l["certificate"] = c.PEM
@@ -287,8 +288,12 @@ func Render(s model.State, controller, secret, websiteURL string) ([]byte, error
 				}
 			}
 		}
+
 		if e.Security == "reality" {
 			l["reality-config"] = map[string]any{"dest": e.RealityTarget, "private-key": e.PrivateKey, "short-id": []string{e.ShortID}, "server-names": []string{e.ServerName}}
+		}
+		if e.ExternalTLS() {
+			l["allow-insecure"] = true
 		}
 		if e.Transport == "ws" {
 			l["ws-path"] = e.Path

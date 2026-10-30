@@ -19,6 +19,8 @@ type Endpoint struct {
 	Protocol      string `json:"protocol"`
 	Host          string `json:"host"`
 	Port          int    `json:"port"`
+	PublicPort    int    `json:"publicPort,omitempty"`
+	TLSMode       string `json:"tlsMode,omitempty"`
 	Enabled       bool   `json:"enabled"`
 	Transport     string `json:"transport"`
 	Path          string `json:"path"`
@@ -47,6 +49,7 @@ type User struct {
 }
 
 type Certificate struct {
+	Names     []string  `json:"names,omitempty"`
 	Engine    string    `json:"engine,omitempty"`
 	CertPath  string    `json:"certPath,omitempty"`
 	KeyPath   string    `json:"keyPath,omitempty"`
@@ -79,6 +82,7 @@ type Website struct {
 }
 
 type State struct {
+	Access               AccessSettings  `json:"access"`
 	Traffic              TrafficSettings `json:"traffic"`
 	DefaultHost          string          `json:"defaultHost"`
 	DefaultCertificateID string          `json:"defaultCertificateId"`
@@ -92,7 +96,7 @@ type State struct {
 }
 
 func Default() State {
-	return State{Endpoints: []Endpoint{}, Users: []User{}, Certificates: []Certificate{}, RetentionDays: 30, Website: Website{Title: "山与海之间", Description: "记录日常，探索世界。", Template: "journal"}}
+	return State{Access: AccessSettings{XHTTPTLS: "external"}, Endpoints: []Endpoint{}, Users: []User{}, Certificates: []Certificate{}, RetentionDays: 30, Website: Website{Title: "山与海之间", Description: "记录日常，探索世界。", Template: "journal"}}
 }
 func Clone(s State) State {
 	b, _ := json.Marshal(s)

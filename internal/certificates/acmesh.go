@@ -185,6 +185,9 @@ func (m *Manager) issueAcmeSH(c model.Certificate) (model.Certificate, error) {
 	if err != nil {
 		return c, err
 	}
+	if err = core.CertificateCovers(cert, c.Domain); err != nil {
+		return c, errors.New("签发证书未覆盖申请域名")
+	}
 	c.PEM = string(pem)
 	c.Key = string(key)
 	c.ExpiresAt = cert.NotAfter

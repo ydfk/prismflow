@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"prismflow/internal/model"
+	"strings"
 )
 
 type variant struct{ protocol, transport, security, label string }
@@ -23,6 +24,8 @@ func (s *Server) createPreset(w http.ResponseWriter, r *http.Request) {
 		Host          string         `json:"host"`
 		Ports         map[string]int `json:"ports"`
 		CertificateID string         `json:"certificateId"`
+		TLSMode       string         `json:"tlsMode"`
+		PublicPort    int            `json:"publicPort"`
 		RealityTarget string         `json:"realityTarget"`
 		UserIDs       []string       `json:"userIds"`
 	}
@@ -78,17 +81,33 @@ func (s *Server) createPreset(w http.ResponseWriter, r *http.Request) {
 			}
 			used[port] = true
 			e := model.Endpoint{Name: fmt.Sprintf("%s · %d", v.label, port), Protocol: v.protocol, Transport: v.transport, Security: v.security, Host: in.Host, Port: port, Enabled: true, CertificateID: in.CertificateID, RealityTarget: in.RealityTarget}
+			if e.Transport == "xhttp" {
+				e.TLSMode = in.TLSMode
+				e.PublicPort = in.PublicPort
+				if e.ExternalTLS() {
+					e.CertificateID = ""
+				}
+			}
+			if e.Security != "tls" {
+				e.CertificateID = ""
+			}
 			if e.Security == "reality" {
 				e.ServerName, _, _ = net.SplitHostPort(in.RealityTarget)
 			} else {
 				for _, c := range st.Certificates {
 					if c.ID == in.CertificateID {
 						e.ServerName = c.Domain
+						if strings.HasPrefix(c.Domain, "*.") {
+							e.ServerName = e.Host
+						}
 					}
 				}
 			}
 			if e.Transport == "xhttp" {
 				e.Path = "/" + model.ID()
+				if e.ExternalTLS() {
+					e.ServerName = e.Host
+				}
 			}
 			if err := model.InitEndpoint(&e); err != nil {
 				return err

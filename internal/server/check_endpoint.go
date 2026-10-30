@@ -80,7 +80,7 @@ func (s *Server) checkEndpoint(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	// TCP 端口只是中间步骤，最终结果仍取决于真实协议请求。
 	if endpoint.Protocol != "hysteria2" && endpoint.Protocol != "tuic" {
-		connection, err := (&net.Dialer{Timeout: 3 * time.Second}).DialContext(ctx, "tcp", net.JoinHostPort(endpoint.Host, strconv.Itoa(endpoint.Port)))
+		connection, err := (&net.Dialer{Timeout: 3 * time.Second}).DialContext(ctx, "tcp", net.JoinHostPort(endpoint.Host, strconv.Itoa(endpoint.ClientPort())))
 		result.Steps = append(result.Steps, checkStep{"入口连接", err == nil, "检查订阅中的服务器地址与端口"})
 		if err != nil {
 			result.State = "unavailable"

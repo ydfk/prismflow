@@ -71,7 +71,19 @@ func newEndpointDefaults(e *model.Endpoint, st model.State, reserved []int) erro
 	if e.Host == "" {
 		e.Host = st.DefaultHost
 	}
-	if e.CertificateID == "" {
+	if e.Native {
+		e.CertificateID = ""
+		e.TLSMode = ""
+		e.PublicPort = 0
+	}
+	if e.ExternalTLS() {
+		e.CertificateID = ""
+		e.ServerName = e.Host
+	}
+	if e.Security != "tls" {
+		e.CertificateID = ""
+	}
+	if e.Security == "tls" && e.CertificateID == "" && !e.ExternalTLS() && !e.Native {
 		e.CertificateID = st.DefaultCertificateID
 	}
 	if e.Port == 0 {

@@ -8,7 +8,7 @@ export const quickChoices = [
 ]
 export function newDraft(snapshot:Snapshot):EndpointDraft {
  const certificateId=snapshot.state.defaultCertificateId||snapshot.state.certificates[0]?.id||''
- return {id:'',name:'',protocol:'vless',transport:'tcp',security:'reality',host:snapshot.state.defaultHost||'',port:0,enabled:true,path:'/prismflow',certificateId,serverName:'www.microsoft.com',realityTarget:'www.microsoft.com:443',privateKey:'',publicKey:'',shortId:'',password:'',masquerade:false,native:false,nativeConfig:'',userIds:[]}
+ return {id:'',name:'',protocol:'vless',transport:'tcp',security:'reality',host:snapshot.state.defaultHost||'',port:0,enabled:true,path:'/prismflow',certificateId,serverName:'www.microsoft.com',realityTarget:'www.microsoft.com:443',privateKey:'',publicKey:'',shortId:'',password:'',masquerade:false,native:false,nativeConfig:'',tlsMode:snapshot.state.access?.xhttpTls||'core',publicPort:0,userIds:[]}
 }
 export function nativeTemplate(protocol:string):string {
  const password=Array.from(crypto.getRandomValues(new Uint8Array(18)),b=>b.toString(16).padStart(2,'0')).join('')
@@ -18,3 +18,4 @@ export function nativeTemplate(protocol:string):string {
  if(protocol==='redir'||protocol==='tproxy')return 'listen: 127.0.0.1\n'
  return '# 填写此监听器的 Mihomo 原生参数；认证、TLS 等由此处配置。\nlisten: 127.0.0.1\n'
 }
+export function certificateName(snapshot:Snapshot,id:string,host:string){const domain=snapshot.state.certificates.find(c=>c.id===id)?.domain;return !domain||domain.startsWith('*.')?host:domain}

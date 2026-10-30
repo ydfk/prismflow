@@ -66,14 +66,28 @@ func (s *Server) sameOrigin(r *http.Request) bool {
 	}
 	expected := s.Options.Origin
 	if expected == "" {
+		expected = s.State().Access.PanelURL
+	}
+	if expected == "" {
 		scheme := "http"
 		if r.TLS != nil {
 			scheme = "https"
 		}
 		expected = scheme + "://" + r.Host
 	}
-	u, e := url.Parse(origin)
-	return e == nil && u.Path == "" && strings.TrimRight(origin, "/") == strings.TrimRight(expected, "/")
+	incoming := normalizedOrigin(origin)
+	if incoming != "" && incoming == normalizedOrigin(strings.TrimRight(expected, "/")) {
+		return true
+	}
+	// 设置公网域名后仍保留本机 SSH 隧道配置入口；显式 ORIGIN 不放宽。
+	if s.Options.Origin == "" && r.TLS == nil && incoming != "" && incoming == normalizedOrigin("http://"+r.Host) {
+		peer, _, _ := net.SplitHostPort(r.RemoteAddr)
+		host, _, _ := net.SplitHostPort(r.Host)
+		if net.ParseIP(peer).IsLoopback() && (host == "localhost" || net.ParseIP(host).IsLoopback()) {
+			return true
+		}
+	}
+	return false
 }
 func (s *Server) status(w http.ResponseWriter, r *http.Request) {
 	var account adminAccount
@@ -174,7 +188,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	token := model.Token(32)
 	sess := session{model.Token(24), now.Add(12 * time.Hour)}
 	s.sessions[tokenHash(token)] = sess
-	http.SetCookie(w, &http.Cookie{Name: "prismflow_session", Value: token, Path: "/", HttpOnly: true, Secure: s.Options.SecureCookie || r.TLS != nil, SameSite: http.SameSiteStrictMode, MaxAge: 43200})
+	http.SetCookie(w, &http.Cookie{Name: "prismflow_session", Value: token, Path: "/", HttpOnly: true, Secure: s.secureCookie(r), SameSite: http.SameSiteStrictMode, MaxAge: 43200})
 	respond(w, 200, map[string]string{"csrf": sess.CSRF})
 }
 func (s *Server) auth(next http.Handler) http.Handler {
@@ -208,7 +222,7 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 		delete(s.sessions, tokenHash(c.Value))
 	}
 	s.authMu.Unlock()
-	http.SetCookie(w, &http.Cookie{Name: "prismflow_session", Value: "", Path: "/", HttpOnly: true, Secure: s.Options.SecureCookie || r.TLS != nil, SameSite: http.SameSiteStrictMode, MaxAge: -1})
+	http.SetCookie(w, &http.Cookie{Name: "prismflow_session", Value: "", Path: "/", HttpOnly: true, Secure: s.secureCookie(r), SameSite: http.SameSiteStrictMode, MaxAge: -1})
 	respond(w, 200, map[string]bool{"ok": true})
 }
 func (s *Server) changePassword(w http.ResponseWriter, r *http.Request) {
@@ -242,4 +256,20 @@ func (s *Server) changePassword(w http.ResponseWriter, r *http.Request) {
 	s.sessions = map[string]session{}
 	s.Store.Event("管理员修改密码，所有会话已失效")
 	respond(w, 200, map[string]bool{"ok": true})
+}
+
+// 浏览器会省略默认端口，域名大小写也不构成不同的 Origin。
+func normalizedOrigin(address string) string {
+	u, err := url.Parse(address)
+	if err != nil || u.Host == "" || u.Path != "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Scheme != "https" && u.Scheme != "http") {
+		return ""
+	}
+	port := u.Port()
+	if port == "" {
+		port = "443"
+		if u.Scheme == "http" {
+			port = "80"
+		}
+	}
+	return u.Scheme + "://" + net.JoinHostPort(strings.ToLower(u.Hostname()), port)
 }
