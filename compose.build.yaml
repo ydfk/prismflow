@@ -1,0 +1,4 @@
+services:
+  prismflow:
+    image: prismflow:local
+    build: .

@@ -74,16 +74,29 @@ else
     systemctl enable --now docker
   fi
   docker compose version >/dev/null || { echo '请安装 Docker Compose 插件后重试。' >&2; exit 1; }
-  ASSET="prismflow-docker-$ARCH.tar.gz"; fetch "$ASSET"; verify "$ASSET"
   fetch compose.release.yaml; verify compose.release.yaml
-  docker load -i "$WORK/$ASSET"
+  IMAGE="ydfk/prismflow:${TAG#v}"
+  COMPOSE="$WORK/compose.release.yaml"
+  if [[ -f /opt/prismflow/compose.yaml ]]; then COMPOSE=/opt/prismflow/compose.yaml; fi
+  resolved=$(PRISMFLOW_IMAGE="$IMAGE" docker compose -f "$COMPOSE" config --format json)
+  jq -e --arg image "$IMAGE" '.services.prismflow.image == $image' <<<"$resolved" >/dev/null || { echo '现有 Compose 未使用 PRISMFLOW_IMAGE；请先调整镜像配置，原部署未改动。' >&2; exit 1; }
+  # 成功拉取后才操作部署；Docker 根据宿主架构选择多架构清单。
+  docker pull "$IMAGE"
   install -d -m 0755 /opt/prismflow
   if [[ ! -d /opt/prismflow/data ]]; then install -d -o 10001 -g 10001 -m 0700 /opt/prismflow/data; fi
   if [[ ! -f /opt/prismflow/compose.yaml ]]; then install -m 0644 "$WORK/compose.release.yaml" /opt/prismflow/compose.yaml; fi
-  # 单独保存镜像版本，不覆盖用户的环境变量或 Compose 修改。
-  printf 'prismflow:%s\n' "${TAG#v}" > /opt/prismflow/image-version
-  PRISMFLOW_IMAGE="prismflow:${TAG#v}" docker compose -f /opt/prismflow/compose.yaml up -d --no-build
-  echo 'Docker 部署完成；数据目录：/opt/prismflow/data'
-  PRISMFLOW_IMAGE="prismflow:${TAG#v}" docker compose -f /opt/prismflow/compose.yaml exec -T prismflow sh -c 'cat /data/setup.token 2>/dev/null || true'
+  previous_image=$(cat /opt/prismflow/image-version 2>/dev/null || true)
+  if ! PRISMFLOW_IMAGE="$IMAGE" docker compose -f /opt/prismflow/compose.yaml up -d --no-build --pull never; then
+    if [[ -n "$previous_image" ]]; then
+      PRISMFLOW_IMAGE="$previous_image" docker compose -f /opt/prismflow/compose.yaml up -d --no-build --pull never || echo '旧镜像恢复失败，请检查 docker compose logs。' >&2
+    fi
+    echo 'Docker 启动命令失败，镜像版本记录未更新。' >&2; exit 1
+  fi
+  # 保留用户环境、Compose 和数据；成功提交后原子记录完整 Hub 镜像名。
+  image_file=$(mktemp /opt/prismflow/.image-version.XXXXXX)
+  printf '%s\n' "$IMAGE" > "$image_file"; chmod 0644 "$image_file"
+  mv -f "$image_file" /opt/prismflow/image-version
+  echo "Docker Hub 部署完成：$IMAGE；数据目录：/opt/prismflow/data"
+  PRISMFLOW_IMAGE="$IMAGE" docker compose -f /opt/prismflow/compose.yaml exec -T prismflow sh -c 'cat /data/setup.token 2>/dev/null || true'
 fi
 echo '管理端默认 127.0.0.1:8080。请使用 SSH 隧道或 HTTPS 反向代理访问。'

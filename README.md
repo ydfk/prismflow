@@ -114,18 +114,27 @@ Docker 版使用独立的一键命令，执行后直接安装：
 curl -fsSL https://github.com/ydfk/prismflow/releases/latest/download/install.sh | sudo bash -s -- --mode docker
 ```
 
-安装器加载对应架构的已构建 Docker 镜像，不需要在 VPS 编译源码，也不依赖 GHCR 权限。上述 Debian / Ubuntu 系统未安装 Docker 时，会从 Docker 官方 APT 仓库安装 Engine 与 Compose 插件。
+安装器从 Docker Hub 拉取 [`ydfk/prismflow`](https://hub.docker.com/r/ydfk/prismflow) 的确切版本，自动选择 amd64/arm64，不需要在 VPS 编译源码。上述 Debian / Ubuntu 系统未安装 Docker 时，会从 Docker 官方 APT 仓库安装 Engine 与 Compose 插件。
 
 | 位置 | 用途 |
 | --- | --- |
 | `/opt/prismflow/compose.yaml` | 生产部署配置，升级时保留自定义修改 |
 | `/opt/prismflow/data` | 持久化数据，容器内为 `/data` |
-| `/opt/prismflow/image-version` | 当前加载的镜像标签 |
+| `/opt/prismflow/image-version` | 当前完整 Hub 镜像名，如 `ydfk/prismflow:1.2.3` |
 
 容器以 UID `10001` 运行，使用 Linux host 网络。新增 TCP / UDP 入口直接监听宿主机，仍需开放服务器与云防火墙。跨原生 / Docker 模式迁移前需先备份并卸载旧服务，安装器不会覆盖另一种已有部署。
 
 <details>
 <summary>Docker 常用命令、证书挂载与源码构建</summary>
+
+也可克隆仓库直接使用默认 Compose，从 Docker Hub 拉取并启动：
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+仓库 Compose 默认使用 `ydfk/prismflow:latest`；生产环境建议通过 `PRISMFLOW_IMAGE=ydfk/prismflow:已发布版本` 固定版本。`latest` 只随稳定版更新，预发布仅提供完整版本标签。首次 Tag 发布前 Hub 镜像不可用。
 
 一键安装后：
 
@@ -147,10 +156,10 @@ volumes:
 
 挂载应包含 live 符号链接指向的 archive，且 UID 10001 具备读取权限。
 
-开发者仍可在完整源码目录中使用仓库 Compose 本地构建；此方式使用命名卷，而不是一键安装器的 bind 数据目录：
+开发者可在完整源码目录中显式叠加源码构建文件；仓库 Compose 使用命名卷，而不是一键安装器的 bind 数据目录：
 
 ```bash
-docker compose up -d --build
+docker compose -f compose.yaml -f compose.build.yaml up -d --build
 docker compose exec prismflow cat /data/setup.token
 ```
 
@@ -197,7 +206,7 @@ ssh -N -L 8080:127.0.0.1:8080 your-user@your-server
 
 Docker 命令需在 `/opt/prismflow` 中先设置 `export PRISMFLOW_IMAGE="$(cat image-version)"`；源码 Compose 部署则在源码目录执行。
 
-原生自动更新每小时检查，默认关闭；在系统设置确认启用，或运行 `sudo prismflow-update auto on`。更新会重启服务并短暂中断连接，启动失败时尝试恢复旧程序。详见 [更新说明](docs/UPDATES.md)。
+Docker Hub 发布需要在 GitHub 仓库配置 `DOCKERHUB_USERNAME` 和 `DOCKERHUB_TOKEN`，详见 [Tag 与 Docker Hub 发布](docs/UPDATES.md#tag-发布流程)。原生自动更新每小时检查，默认关闭；在系统设置确认启用，或运行 `sudo prismflow-update auto on`。更新会重启服务并短暂中断连接，启动失败时尝试恢复旧程序。详见 [更新说明](docs/UPDATES.md)。
 
 安装脚本的服务配置位于 `/etc/prismflow/environment`，数据位于 `/var/lib/prismflow`；一键 Docker 数据在宿主 `/opt/prismflow/data`，容器内为 `/data`。升级不会自动替换数据目录中优先使用的受管 Mihomo 内核。
 

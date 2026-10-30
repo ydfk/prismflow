@@ -17,10 +17,17 @@ jobs:
       - name: Validate tag on main
         env:
           TAG: ${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           [[ "$TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$ ]]
           git fetch origin main
           git merge-base --is-ancestor HEAD origin/main
+          status=$(curl --silent --show-error --retry 3 --max-time 60 -o "$RUNNER_TEMP/release.json" -w '%{http_code}' -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$TAG")
+          case "$status" in
+            200) jq -e '.draft == true' "$RUNNER_TEMP/release.json" >/dev/null || { echo '已发布版本不可覆盖，请使用新的 Tag。' >&2; exit 1; } ;;
+            404) ;;
+            *) echo "Release 状态查询失败（HTTP $status），停止发布。" >&2; exit 1 ;;
+          esac
       - uses: actions/setup-go@v5
         with:
           go-version: '1.25.x'
@@ -62,27 +69,41 @@ jobs:
   docker:
     needs: package
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        arch: [amd64, arm64]
+    outputs:
+      digest: ${{ steps.image.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
-      - name: Build loadable Docker image
+      - name: Check Docker Hub credentials
         env:
-          VERSION: ${{ github.ref_name }}
-          ARCH: ${{ matrix.arch }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
-          mkdir -p dist
-          docker buildx build --platform "linux/$ARCH" --build-arg "VERSION=$VERSION" --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" --label "org.opencontainers.image.version=$VERSION" --output "type=docker,dest=dist/prismflow-docker-$ARCH.tar" -t "prismflow:${VERSION#v}" .
-          gzip -n "dist/prismflow-docker-$ARCH.tar"
-      - uses: actions/upload-artifact@v4
+          [[ -n "$DOCKERHUB_USERNAME" && -n "$DOCKERHUB_TOKEN" ]] || { echo '请配置 DOCKERHUB_USERNAME 与 DOCKERHUB_TOKEN，账户需有 ydfk/prismflow 推送权限。' >&2; exit 1; }
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
         with:
-          name: docker-${{ matrix.arch }}
-          path: dist/*.tar.gz
-          if-no-files-found: error
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Resolve image version
+        id: version
+        run: echo "tag=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+      - name: Build and push versioned Docker Hub image
+        id: image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: VERSION=${{ github.ref_name }}
+          tags: ydfk/prismflow:${{ steps.version.outputs.tag }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ github.ref_name }}
+          cache-from: type=gha,scope=prismflow-release
+          cache-to: type=gha,mode=max,scope=prismflow-release
+          provenance: false
+          sbom: false
   publish:
     needs: [package, docker]
     runs-on: ubuntu-latest
@@ -98,6 +119,7 @@ jobs:
         run: |
           cp scripts/bootstrap.sh dist/install.sh
           cp deploy/compose.release.yaml dist/compose.release.yaml
+          sed -i "s#ydfk/prismflow:latest#ydfk/prismflow:${GITHUB_REF_NAME#v}#g" dist/compose.release.yaml
           cd dist
           sha256sum *.tar.gz install.sh compose.release.yaml > SHA256SUMS
       - name: Publish GitHub Release
@@ -118,3 +140,26 @@ jobs:
           else
             gh release edit "$TAG" --draft=false --prerelease=false --latest
           fi
+  promote:
+    needs: [publish, docker]
+    if: ${{ !contains(github.ref_name, '-') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Promote stable Docker Hub tags
+        if: ${{ !contains(github.ref_name, '-') }}
+        env:
+          TAG: ${{ github.ref_name }}
+          DIGEST: ${{ needs.docker.outputs.digest }}
+        run: |
+          [[ "$TAG" != *-* ]] || exit 0
+          [[ "$TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || { echo '稳定镜像别名需要正式版本 Tag。' >&2; exit 1; }
+          [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo '镜像清单 digest 无效，停止更新别名。' >&2; exit 1; }
+          version=${TAG#v}
+          major=${version%%.*}
+          minor=${version%.*}
+          docker buildx imagetools create --tag "ydfk/prismflow:$major" --tag "ydfk/prismflow:$minor" --tag ydfk/prismflow:latest "ydfk/prismflow@$DIGEST"

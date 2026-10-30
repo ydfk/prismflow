@@ -14,7 +14,11 @@ set -euo pipefail
 url= output=
 while [[ $# -gt 0 ]];do case "$1" in -o) output=$2;shift 2 ;; https://*) url=$1;shift ;; --retry|--connect-timeout|--max-time) shift 2 ;; *) shift ;; esac;done
 printf '%s\n' "$url" >> "$MOCK_API"
-if [[ "$url" == */releases/latest || "$url" == */releases/tags/* ]];then tag=$(cat "$FIXTURES/latest");printf '{"tag_name":"%s","draft":false,"prerelease":false}' "$tag";exit;fi
+if [[ "$url" == */releases/latest || "$url" == */releases/tags/* ]];then
+ tag=${url##*/};if [[ "$tag" == latest ]];then tag=$(cat "$FIXTURES/latest");fi
+ prerelease=false;if [[ "$tag" == *-* ]];then prerelease=true;fi
+ printf '{"tag_name":"%s","draft":false,"prerelease":%s}' "$tag" "$prerelease";exit
+fi
 tag=$(awk -F/ '{print $(NF-1)}' <<<"$url");asset=${url##*/}
 cp "$FIXTURES/$tag/$asset" "$output"
 MOCK
@@ -30,7 +34,13 @@ fi
 MOCK
 cat > "$WORK/bin/docker" <<'MOCK'
 #!/usr/bin/env bash
+set -euo pipefail
 printf 'docker %s image=%s\n' "$*" "${PRISMFLOW_IMAGE:-}" >> "$MOCK_LOG"
+if [[ "$1" == compose && " $* " == *' config '* ]]; then
+  printf '{"services":{"prismflow":{"image":"%s"}}}\n' "${MOCK_DOCKER_RESOLVED_IMAGE:-${PRISMFLOW_IMAGE:-}}"
+fi
+if [[ "$1" == pull && "$2" == "${MOCK_DOCKER_PULL_FAIL:-}" ]]; then exit 1; fi
+if [[ "$1" == compose && " $* " == *' up '* && "${PRISMFLOW_IMAGE:-}" == "${MOCK_DOCKER_UP_FAIL_IMAGE:-}" ]]; then exit 1; fi
 MOCK
 chmod +x "$WORK/bin/"*
 fixture(){
@@ -40,11 +50,11 @@ fixture(){
  cp "$SOURCE"/deploy/prismflow* "$dir/deploy/"
  printf '#!/usr/bin/env bash\necho "PrismFlow %s"\n' "${tag#v}" > "$dir/prismflow";chmod +x "$dir/prismflow"
  tar -czf "$FIXTURES/$tag/prismflow-linux-amd64.tar.gz" -C "$WORK/package" prismflow-linux-amd64
- printf 'docker fixture\n' | gzip > "$FIXTURES/$tag/prismflow-docker-amd64.tar.gz"
+
  cp "$SOURCE/deploy/compose.release.yaml" "$FIXTURES/$tag/compose.release.yaml"
  (cd "$FIXTURES/$tag";sha256sum *.tar.gz compose.release.yaml > SHA256SUMS)
 }
-for tag in v1.0.0 v1.1.0 v1.2.0 v1.3.0;do fixture "$tag";done
+for tag in v1.0.0 v1.1.0 v1.2.0 v1.3.0 v1.3.0-rc.1;do fixture "$tag";done
 printf 'v1.0.0\n' > "$FIXTURES/latest"
 bash "$SOURCE/scripts/bootstrap.sh" --mode native
 [[ $(/usr/local/bin/prismflow version) == 'PrismFlow 1.0.0' ]]
@@ -78,10 +88,35 @@ if bash "$SOURCE/scripts/bootstrap.sh" --mode docker;then echo '允许覆盖原�
 bash "$SOURCE/scripts/uninstall.sh"
 printf 'v1.0.0\n' > "$FIXTURES/latest"
 bash "$SOURCE/scripts/bootstrap.sh" --mode docker
-[[ -f /opt/prismflow/compose.yaml && $(cat /opt/prismflow/image-version) == prismflow:1.0.0 ]]
+[[ -f /opt/prismflow/compose.yaml && $(cat /opt/prismflow/image-version) == ydfk/prismflow:1.0.0 ]]
 printf 'docker-data' > /opt/prismflow/data/sentinel
+# 模拟旧的 docker load 安装，升级必须保留 Compose 与数据并切换为 Hub 镜像。
+printf 'prismflow:1.0.0\n' > /opt/prismflow/image-version
+printf '\n# user-customization\n' >> /opt/prismflow/compose.yaml
+compose_hash=$(sha256sum /opt/prismflow/compose.yaml)
 printf 'v1.1.0\n' > "$FIXTURES/latest"
 bash "$SOURCE/scripts/bootstrap.sh" --mode docker
 [[ $(cat /opt/prismflow/data/sentinel) == docker-data ]]
-grep -q 'image=prismflow:1.1.0' "$MOCK_LOG"
-echo 'PASS: native/docker install, opt-in updates, rollback, checksum rejection, privilege boundary and data preservation'
+[[ $(cat /opt/prismflow/image-version) == ydfk/prismflow:1.1.0 && $(sha256sum /opt/prismflow/compose.yaml) == "$compose_hash" ]]
+grep -q 'docker pull ydfk/prismflow:1.1.0' "$MOCK_LOG"
+if grep -q '^docker load ' "$MOCK_LOG"; then echo '仍然使用离线镜像导入' >&2;exit 1;fi
+# Hub 不可用或现有 Compose 指向其他镜像时，不能替换部署记录或停止原容器。
+printf 'v1.2.0\n' > "$FIXTURES/latest"
+before=$(grep -c ' up -d ' "$MOCK_LOG")
+if MOCK_DOCKER_PULL_FAIL=ydfk/prismflow:1.2.0 bash "$SOURCE/scripts/bootstrap.sh" --mode docker;then echo '未拒绝拉取失败' >&2;exit 1;fi
+[[ $(cat /opt/prismflow/image-version) == ydfk/prismflow:1.1.0 && $(grep -c ' up -d ' "$MOCK_LOG") == "$before" ]]
+if MOCK_DOCKER_RESOLVED_IMAGE=custom/image:stable bash "$SOURCE/scripts/bootstrap.sh" --mode docker;then echo '未拒绝硬编码的其他镜像' >&2;exit 1;fi
+[[ $(cat /opt/prismflow/image-version) == ydfk/prismflow:1.1.0 ]]
+if MOCK_DOCKER_UP_FAIL_IMAGE=ydfk/prismflow:1.2.0 bash "$SOURCE/scripts/bootstrap.sh" --mode docker;then echo '未拒绝启动命令失败' >&2;exit 1;fi
+[[ $(cat /opt/prismflow/image-version) == ydfk/prismflow:1.1.0 && $(cat /opt/prismflow/data/sentinel) == docker-data ]]
+grep -q 'up -d --no-build --pull never image=ydfk/prismflow:1.1.0' "$MOCK_LOG"
+# Compose 仍从 Release 校验，镜像改成 Hub 不应放宽安装文件校验。
+printf '\n# tamper\n' >> "$FIXTURES/v1.2.0/compose.release.yaml"
+if bash "$SOURCE/scripts/bootstrap.sh" --mode docker;then echo '未拒绝损坏的 Compose 资产' >&2;exit 1;fi
+[[ $(cat /opt/prismflow/image-version) == ydfk/prismflow:1.1.0 ]]
+# latest 不接受预发布；显式指定则拉取对应 Hub 标签。
+printf 'v1.3.0-rc.1\n' > "$FIXTURES/latest"
+if bash "$SOURCE/scripts/bootstrap.sh" --mode docker;then echo 'latest 接受了预发布' >&2;exit 1;fi
+bash "$SOURCE/scripts/bootstrap.sh" --mode docker --version v1.3.0-rc.1
+[[ $(cat /opt/prismflow/image-version) == ydfk/prismflow:1.3.0-rc.1 && $(cat /opt/prismflow/data/sentinel) == docker-data ]]
+echo 'PASS: native install/update; Docker Hub pull/migration/failure recovery; prerelease pinning, checksums, privileges and data preservation'

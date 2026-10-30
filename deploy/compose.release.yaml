@@ -1,6 +1,6 @@
 services:
   prismflow:
-    image: ${PRISMFLOW_IMAGE:?请指定已加载的 PrismFlow 镜像版本}
+    image: ${PRISMFLOW_IMAGE:-ydfk/prismflow:latest}
     restart: unless-stopped
     network_mode: host
     environment:
