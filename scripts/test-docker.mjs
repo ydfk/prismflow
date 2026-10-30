@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import assert from 'node:assert/strict'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
@@ -34,8 +34,42 @@ async function api(path, method = 'GET', body, expected = 200) {
 }
 async function login() { csrf = (await (await api('/session', 'POST', { username: 'admin', password })).json()).csrf }
 async function state() { return (await api('/state')).json() }
+async function waitForCore() {
+  const deadline = Date.now() + 360000
+  let install
+  do {
+    install = await (await api('/core/install')).json()
+    if (install.job.status === 'failed') throw new Error(install.job.message)
+    if (install.job.status !== 'running' && (await state()).core.available) return install
+    if (Date.now() > deadline) throw new Error('首次启动自动下载内核超时')
+    await pause(1000)
+  } while (true)
+}
 try {
+  const image = process.env.PRISMFLOW_TEST_IMAGE || 'prismflow:local'
+  docker('run', '--rm', '--network', 'none', '--entrypoint', 'sh', image, '-ec',
+    'test ! -e /usr/local/bin/mihomo; test ! -e /data/bin/mihomo; test -f /usr/share/zoneinfo/Asia/Shanghai; curl --version; openssl version')
   docker('volume', 'create', volume)
+  // 无网络的首次启动仍可打开面板，失败后可保留数据重新下载。
+  docker('run', '--detach', '--network', 'none', '--name', name,
+    '--mount', `type=volume,source=${volume},target=/data`, image)
+  created = true
+  let offlineReady = false
+  for (let i = 0; i < 120; i++) {
+    const logResult = spawnSync('docker', ['logs', name], { encoding: 'utf8', windowsHide: true, timeout: 10000 })
+    assert.equal(logResult.status, 0)
+    const logs = logResult.stdout + logResult.stderr
+    if (logs.includes('内核安装失败')) {
+      assert.match(docker('exec', name, 'curl', '-fsS', 'http://127.0.0.1:8080/api/status'), /setup/)
+      assert.equal(docker('exec', name, 'sh', '-c', 'test ! -f /data/bin/mihomo && echo absent'), 'absent')
+      offlineReady = true
+      break
+    }
+    await pause(250)
+  }
+  assert.ok(offlineReady, '无网络启动未在 30 秒内报告下载失败')
+  docker('rm', '--force', name)
+  created = false
   docker('run', '--detach', '--name', name, '--cap-drop', 'ALL', '--cap-add', 'NET_BIND_SERVICE', '--security-opt', 'no-new-privileges',
     '-p', '127.0.0.1::8080', '-p', '127.0.0.1::8081', '-e', 'PRISMFLOW_LISTEN=0.0.0.0:8080', '-e', 'PRISMFLOW_PUBLIC_LISTEN=0.0.0.0:8081',
     '--mount', `type=volume,source=${volume},target=/data`, process.env.PRISMFLOW_TEST_IMAGE || 'prismflow:local')
@@ -47,6 +81,10 @@ try {
   const token = docker('exec', name, 'cat', '/data/setup.token')
   await api('/setup', 'POST', { token, username: 'admin', password }, 201)
   await login()
+  const initialInstall = await waitForCore()
+  assert.equal(initialInstall.job.status, 'done', initialInstall.job.message)
+  assert.equal(initialInstall.path, '/data/bin/mihomo')
+  const coreChecksum = docker('exec', name, 'sha256sum', '/data/bin/mihomo')
   await api('/certificates/import','POST',JSON.parse(readFileSync(fixturePath,'utf8')))
   const certificate=(await state()).state.certificates[0]
   const ports=await (await api('/ports/random','POST',{count:1})).json()
@@ -80,6 +118,8 @@ try {
   admin = `http://${docker('port', name, '8080/tcp')}`
   const restartedPublic = `http://${docker('port', name, '8081/tcp')}`
   await ready(); await login()
+  assert.equal(docker('exec', name, 'sha256sum', '/data/bin/mihomo'), coreChecksum)
+  assert.notEqual((await (await api('/core/install')).json()).job.status, 'running', '重启不应重复下载已有内核')
   for (let i = 0; i < 40 && !(await state()).core.running; i++) await pause(250)
   assert.equal((await state()).core.running, true)
   const liveLink = share.url.replace(publicURL, restartedPublic)
@@ -96,8 +136,40 @@ try {
   await api('/core/apply', 'POST')
   assert.equal((await fetch(liveLink)).status, 200)
   const usage = docker('stats', '--no-stream', '--format', '{{.MemUsage}}', name)
+  // 用同一数据卷断网重建，并模拟旧 Compose 的初始内核路径。
+  docker('rm', '--force', name)
+  created = false
+  docker('run', '--detach', '--network', 'none', '--name', name, '-e', 'PRISMFLOW_CORE=/usr/local/bin/mihomo',
+    '--mount', `type=volume,source=${volume},target=/data`, image)
+  created = true
+  let cachedStarted = false
+  let cachedSession = ''
+  for (let i = 0; i < 120; i++) {
+    const result = spawnSync('docker', ['logs', name], { encoding: 'utf8', windowsHide: true, timeout: 10000 })
+    assert.equal(result.status, 0)
+    const logs = result.stdout + result.stderr
+    assert.ok(!logs.includes('开始下载 Mihomo'), '已有内核时断网重建不应触发下载')
+    const probe = spawnSync('docker', ['exec', name, 'sh', '-c', 'curl -fsS http://127.0.0.1:8080/api/status'],
+      { encoding: 'utf8', windowsHide: true, timeout: 10000 })
+    if (probe.status === 0) {
+      if (!cachedSession) {
+        const loginResponse = docker('exec', name, 'curl', '-fsS', '-D', '-', '-H', 'Content-Type: application/json',
+          '--data', JSON.stringify({username: 'admin', password}), 'http://127.0.0.1:8080/api/session')
+        cachedSession = loginResponse.match(/set-cookie: ([^;\r\n]+)/i)?.[1]
+        assert.ok(cachedSession, '断网重建后登录失败')
+      }
+      const snapshot = JSON.parse(docker('exec', name, 'curl', '-fsS', '-H', `Cookie: ${cachedSession}`, 'http://127.0.0.1:8080/api/state'))
+      if (snapshot.core.running && snapshot.appliedRevision === snapshot.state.revision) {
+        assert.equal(docker('exec', name, 'sha256sum', '/data/bin/mihomo'), coreChecksum)
+        cachedStarted = true
+        break
+      }
+    }
+    await pause(250)
+  }
+  assert.ok(cachedStarted, '断网重建未能复用已有内核和配置')
   console.log(JSON.stringify({ result: 'passed', image: process.env.PRISMFLOW_TEST_IMAGE || 'prismflow:local', nonRootUID: 10001, listenerPort: endpoint.port,
-    checks: ['setup', 'CSRF session', 'automatic apply', 'subscription', 'Linux interface accounting + subscription headers', 'public isolation', 'restart persistence', 'token rotation', 'encrypted backup restore'], idleContainerMemory: usage }, null, 2))
+    checks: ['no bundled core', 'offline startup keeps panel available', 'automatic core download + SHA-256', 'persistent core reused after restart', 'offline recreate with legacy core path', 'setup', 'CSRF session', 'automatic apply', 'subscription', 'Linux interface accounting + subscription headers', 'public isolation', 'restart persistence', 'token rotation', 'encrypted backup restore'], idleContainerMemory: usage }, null, 2))
 } finally {
   if (created) docker('rm', '--force', name)
   docker('volume', 'rm', volume)

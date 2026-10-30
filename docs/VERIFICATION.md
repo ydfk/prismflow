@@ -84,3 +84,12 @@ Actions 语法与 Compose 配置解析通过。一次性 root 容器的 mock 安
 按用户要求删除独立 CI，并从 Release 移除单元测试、race、协议探测和 Playwright 阶段，仅在版本 Tag 推送时构建发布。Docker 改为 linux/amd64，去掉 QEMU；原生包继续 amd64/arm64。下载阶段指定 name: native，构建阶段关闭 DOCKER_BUILD_RECORD_UPLOAD，避免将 .dockerbuild 记录误作 ZIP 解压。安装器在网络或系统变更前拒绝 ARM64 Docker 模式。
 
 本地 Actions 语法、Shell 语法和安装脚本回归通过。未重跑旧 v0.1.0 任务，因为重跑仍绑定旧提交；修复的远程发布需使用包含修复的新 Tag。
+## 2026-10-30 Docker 镜像精简与内核持久化
+
+运行层改用 Alpine 3.24，保留 ca-certificates、curl、openssl、tzdata 和 UID 10001；移除预装 Mihomo 与对应源码归档。Docker 启动缺少可用内核时，后台复用现有下载任务，校验固定 SHA-256 并安装到 /data/bin/mihomo；下载失败不阻塞管理面板，可在系统设置重试。原生安装行为保持不变。
+
+本地 linux/amd64 最终镜像 prismflow:slim-test：OCI gzip 压缩层合计 13,815,226 字节（约 13.8MB）；Docker history 解压层合计约 34MB。此前已发布 v0.1.1 为压缩约 65MB、解压层约 180MB。Docker Desktop 本地显示磁盘占用约 48MB，与单独计算压缩层或解压层的口径不同。下载后的 Mihomo 约 62MB，位于持久化数据目录，不计入镜像。
+
+全量 Go 测试、go vet、前端生产构建、三种 Compose 配置解析与 git diff --check 通过。实际 Alpine 容器验收覆盖：镜像没有内核、断网首次启动仍可打开面板、官方内核自动下载与 SHA-256、UID 10001、协议配置自动生效、订阅及流量 Header、公开服务隔离、重启不重复下载、保留数据卷断网重建及旧 PRISMFLOW_CORE 路径兼容、令牌轮换和加密备份恢复。断网重建通过鉴权状态 API 确认核心运行及配置版本一致。Alpine 中实际下载官方 acme.sh、校验归档、执行 --version 和缓存复用通过；不代表真实 CA 签发或续期已验收。
+
+本轮仅构建并验证本地镜像，未创建新 Tag、未发布 Release 或推送 Docker Hub；已发布镜像不自动改变。生产 VPS、完整公网证书签发和跨天续期仍需目标环境验收。

@@ -110,6 +110,10 @@ func (s *Server) Applied() model.State {
 }
 func (s *Server) State() model.State { s.mu.Lock(); defer s.mu.Unlock(); return model.Clone(s.state) }
 func (s *Server) Run() {
+	// 精简 Docker 镜像不预装内核；下载在后台执行，失败时面板仍可用于重试。
+	if s.Options.InstallMode == "docker" && !s.Core.Available() {
+		s.startCoreInstall()
+	}
 	go s.Metrics.Run(s.ctx)
 	go s.Traffic.Run(s.ctx)
 	go s.renewLoop()

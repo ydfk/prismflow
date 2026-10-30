@@ -15,7 +15,7 @@ Mihomo 通过独立子进程和本机 HTTP API 运行，未链接进 PrismFlow G
 - 下载 SHA-256 固定在 internal/core/download.go。
 
 Linux 发布包只包含 PrismFlow；安装脚本按需下载独立 Mihomo。
-Docker 镜像包含 Mihomo，其许可证及对应源码归档放在 /usr/share/doc/mihomo。
+Docker 镜像不包含 Mihomo 二进制或源码归档；首次启动缺少内核时，从上述官方发行页下载并校验 SHA-256，保存到持久化数据目录的 bin/mihomo。其许可证与对应源码可通过上述上游链接获取。
 
 ## 程序依赖
 

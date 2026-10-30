@@ -5,7 +5,7 @@ services:
     network_mode: host
     environment:
       PRISMFLOW_DATA: /data
-      PRISMFLOW_CORE: /usr/local/bin/mihomo
+      PRISMFLOW_CORE: /data/bin/mihomo
       PRISMFLOW_LISTEN: 127.0.0.1:8080
       PRISMFLOW_PUBLIC_LISTEN: 127.0.0.1:8081
       PRISMFLOW_ORIGIN: ${PRISMFLOW_ORIGIN:-}

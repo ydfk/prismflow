@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"errors"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -26,16 +27,27 @@ func (s *Server) coreInstallStatus(w http.ResponseWriter, r *http.Request) {
 	respond(w, 200, map[string]any{"job": job, "path": s.Core.BinaryPath(), "version": model.CoreVersion})
 }
 func (s *Server) installCore(w http.ResponseWriter, r *http.Request) {
-	s.installMu.Lock()
-	if s.installJob.Status == "running" {
-		s.installMu.Unlock()
+	job, started := s.startCoreInstall()
+	if !started {
 		fail(w, 409, errors.New("内核下载正在进行"))
 		return
+	}
+	respond(w, 202, job)
+}
+
+// 自动下载与手动安装共用任务锁，避免并发替换同一个内核文件。
+func (s *Server) startCoreInstall() (Job, bool) {
+	s.installMu.Lock()
+	if s.installJob.Status == "running" {
+		job := s.installJob
+		s.installMu.Unlock()
+		return job, false
 	}
 	job := Job{ID: model.ID(), Domain: "Mihomo", Status: "running", Message: "正在从官方发行页下载并校验 SHA-256", CreatedAt: time.Now().UTC()}
 	s.installJob = job
 	s.installMu.Unlock()
-	go func() {
+	log.Printf("开始下载 Mihomo %s，安装目录 %s", model.CoreVersion, managedCorePath(s.Options.DataDir))
+	go func(job Job) {
 		ctx, cancel := context.WithTimeout(s.ctx, 6*time.Minute)
 		defer cancel()
 		candidate := managedCorePath(s.Options.DataDir) + ".candidate"
@@ -54,8 +66,9 @@ func (s *Server) installCore(w http.ResponseWriter, r *http.Request) {
 		s.installJob = job
 		s.installMu.Unlock()
 		s.Store.Event("内核安装任务：" + job.Status)
-	}()
-	respond(w, 202, job)
+		log.Print(job.Message)
+	}(job)
+	return job, true
 }
 func (s *Server) activateCore(ctx context.Context, candidate string) error {
 	s.mu.Lock()

@@ -122,6 +122,8 @@ curl -fsSL https://github.com/ydfk/prismflow/releases/latest/download/install.sh
 | `/opt/prismflow/data` | 持久化数据，容器内为 `/data` |
 | `/opt/prismflow/image-version` | 当前完整 Hub 镜像名，如 `ydfk/prismflow:1.2.3` |
 
+镜像基于 Alpine，不预装 Mihomo。首次启动缺少内核时会在后台从官方发行页下载锁定版本、校验 SHA-256，并保存到 `/data/bin/mihomo`；映射数据目录中的内核在重启、重建和升级后继续使用，不重复下载。首次下载需要访问 GitHub；失败不影响打开面板，可在「系统设置」重试，或离线放置锁定版本的可执行文件到该路径（UID 10001 可读且可执行）。内核约占 62MB 数据目录空间，不计入镜像。
+
 容器以 UID `10001` 运行，使用 Linux host 网络。新增 TCP / UDP 入口直接监听宿主机，仍需开放服务器与云防火墙。跨原生 / Docker 模式迁移前需先备份并卸载旧服务，安装器不会覆盖另一种已有部署。
 
 <details>
@@ -176,7 +178,7 @@ ssh -N -L 8080:127.0.0.1:8080 your-user@your-server
 ```
 
 1. **初始化管理员**：填写安装步骤读取的 `setup.token`，设置用户名与至少 12 字节的密码。初始化成功后令牌文件自动删除。
-2. **准备内核与证书**：在「系统设置」安装内核；在「域名与证书」设置面板、订阅和节点地址；REALITY 与外部 TLS 的 XHTTP 无需绑定内核证书。
+2. **准备内核与证书**：Docker 首次启动自动下载内核，原生版本在「系统设置」安装；在「域名与证书」设置面板、订阅和节点地址；REALITY 与外部 TLS 的 XHTTP 无需绑定内核证书。
 3. **创建入口并分配用户**：使用快速或普通创建，再为用户选择协议。托管入口没有启用的关联用户时不监听。
 4. **配置公开订阅地址**：将订阅域名反代至 8081，保存公开 HTTPS 根地址，在用户列表打开订阅弹窗，复制链接或扫描二维码导入客户端。
 5. **验证连接**：使用入口检测，再在实际客户端确认公网可达性；按需设置流量周期与伪装网站。
@@ -228,7 +230,7 @@ Docker Hub 发布需要在 GitHub 仓库配置 `DOCKERHUB_USERNAME` 和 `DOCKERH
 | `PRISMFLOW_LISTEN` | `127.0.0.1:8080` | 管理监听地址 |
 | `PRISMFLOW_PUBLIC_LISTEN` | `127.0.0.1:8081` | 公开服务监听地址 |
 | `PRISMFLOW_CONTROLLER` | `127.0.0.1:9097` | 控制器，仅支持回环 IP |
-| `PRISMFLOW_CORE` | `mihomo` | 初始内核路径，数据目录中的受管内核优先；Windows 默认 `mihomo.exe` |
+| `PRISMFLOW_CORE` | `mihomo` | 初始内核路径，数据目录中的受管内核优先；Docker 为 `/data/bin/mihomo`，Windows 默认 `mihomo.exe`。Docker 缺少内核时自动下载 |
 | `PRISMFLOW_ORIGIN` | 空 | 管理源地址；非空时优先于面板保存的公网地址 |
 | `PRISMFLOW_TLS_CERT` / `PRISMFLOW_TLS_KEY` | 空 | 可选管理 HTTPS 证书，须成对设置 |
 | `PRISMFLOW_ACME_SH` | 空 | 可选已有 acme.sh 的绝对路径 |

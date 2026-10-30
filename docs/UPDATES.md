@@ -22,6 +22,8 @@ curl -fsSL https://github.com/ydfk/prismflow/releases/latest/download/install.sh
 
 Docker 部署文件也从同一个 Release 获取并校验 SHA-256，镜像不再通过 GitHub 的 tar 归档分发。数据位于 `/opt/prismflow/data`，Compose 位于 `/opt/prismflow/compose.yaml`，`image-version` 记录完整镜像名。升级时先成功拉取镜像，再重建容器；拉取失败不改原部署，启动命令失败保留旧版本记录并尝试恢复旧镜像。Compose 返回启动命令成功不等于业务端到端验收，应继续查看日志和面板。
 
+Docker 镜像使用 Alpine，不预装代理内核。启动时如果没有可用 Mihomo，会在后台下载固定版本并校验 SHA-256，持久化到 `/data/bin/mihomo`；已有受管内核不重复下载。下载失败时仍可打开面板，在系统设置重试。旧 Compose 即使仍设置 `PRISMFLOW_CORE=/usr/local/bin/mihomo`，数据目录中的内核也会优先使用；建议将该变量更新为 `/data/bin/mihomo`。原生安装仍由面板手动安装内核。
+
 重新运行安装器保留用户的 Compose、环境配置和数据。旧 `docker load` 安装也可迁移，前提是 Compose 的 image 使用 `PRISMFLOW_IMAGE` 变量；若已硬编码其他镜像，安装器会报错并要求先手动调整。常用命令：
 
 ```bash
