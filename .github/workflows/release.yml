@@ -1,0 +1,114 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate tag on main
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          [[ "$TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$ ]]
+          git fetch origin main
+          git merge-base --is-ancestor HEAD origin/main
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x'
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci && npm run build
+        working-directory: web
+      - run: go test -race ./... && go vet ./...
+      - run: for script in scripts/*.sh; do bash -n "$script"; done
+      - run: docker run --rm --user 0 --mount type=bind,source="$PWD",target=/workspace,readonly golang:1.25-bookworm bash /workspace/scripts/test-install.sh
+      - run: go build -o .cache/prismflow ./cmd/prismflow
+      - run: .cache/prismflow install-core --output .cache/mihomo
+      - run: MIHOMO_BINARY="$PWD/.cache/mihomo" go test ./internal/core -run Integration -v
+      - run: npx playwright install --with-deps chromium
+        working-directory: web
+      - run: npm run test:e2e
+        working-directory: web
+      - name: Build versioned native archives
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          node scripts/collect-licenses.mjs
+          bash scripts/package.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native
+          path: dist/*.tar.gz
+          if-no-files-found: error
+  docker:
+    needs: package
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Build loadable Docker image
+        env:
+          VERSION: ${{ github.ref_name }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          mkdir -p dist
+          docker buildx build --platform "linux/$ARCH" --build-arg "VERSION=$VERSION" --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" --label "org.opencontainers.image.version=$VERSION" --output "type=docker,dest=dist/prismflow-docker-$ARCH.tar" -t "prismflow:${VERSION#v}" .
+          gzip -n "dist/prismflow-docker-$ARCH.tar"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: docker-${{ matrix.arch }}
+          path: dist/*.tar.gz
+          if-no-files-found: error
+  publish:
+    needs: [package, docker]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Prepare installer and checksums
+        run: |
+          cp scripts/bootstrap.sh dist/install.sh
+          cp deploy/compose.release.yaml dist/compose.release.yaml
+          cd dist
+          sha256sum *.tar.gz install.sh compose.release.yaml > SHA256SUMS
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if draft=$(gh release view "$TAG" --json isDraft --jq '.isDraft' 2>/dev/null); then
+            [[ "$draft" == true ]] || { echo '已发布版本不可覆盖，请使用新的 Tag。' >&2; exit 1; }
+          else
+            args=(--draft --verify-tag --generate-notes)
+            if [[ "$TAG" == *-* ]]; then args+=(--prerelease); fi
+            gh release create "$TAG" "${args[@]}"
+          fi
+          gh release upload "$TAG" --clobber dist/*.tar.gz dist/SHA256SUMS dist/install.sh dist/compose.release.yaml
+          if [[ "$TAG" == *-* ]]; then
+            gh release edit "$TAG" --draft=false --prerelease --latest=false
+          else
+            gh release edit "$TAG" --draft=false --prerelease=false --latest
+          fi

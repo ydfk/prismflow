@@ -1,0 +1,260 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-30T01:56:28.1406747Z",
+  "title": "Design System: PrismFlow · 棱流",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "香槟橙"
+      },
+      "light-primary": {
+        "role": "primary",
+        "displayName": "焙茶棕"
+      },
+      "bg": {
+        "role": "neutral",
+        "displayName": "暖黑底"
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "暖灰玻璃"
+      },
+      "solid": {
+        "role": "neutral",
+        "displayName": "实心暖灰"
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "暖白正文"
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "石灰说明"
+      },
+      "light-bg": {
+        "role": "neutral",
+        "displayName": "暖白底"
+      },
+      "chart-upload": {
+        "role": "semantic",
+        "displayName": "灰绿上传"
+      },
+      "danger": {
+        "role": "semantic",
+        "displayName": "错误红"
+      },
+      "online": {
+        "role": "semantic",
+        "displayName": "在线绿"
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "purpose": "页面主标题 22px，手机为 20px；紧凑模式隐藏描述行。",
+        "displayName": "页面标题"
+      },
+      "mono": {
+        "purpose": "端口、路径等需要对齐的信息。",
+        "displayName": "等宽信息"
+      },
+      "display": {
+        "purpose": "仅登录页桌面叙事，手机隐藏。",
+        "displayName": "登录叙事"
+      },
+      "title": {
+        "purpose": "常规节标题 15px；弹窗标题桌面 16px、手机 15px。",
+        "displayName": "面板标题"
+      },
+      "label": {
+        "purpose": "表单字段名称；按钮与导航使用同字级及各自字重。",
+        "displayName": "字段标签"
+      },
+      "body": {
+        "purpose": "基础字级；1.7 行高用于段落阅读内容。",
+        "displayName": "正文"
+      },
+      "metric": {
+        "purpose": "真实资源数量和服务器周期流量；桌面30px、手机27px，使用等宽数字；代理图表仍按所选时段展示。",
+        "displayName": "资源主值"
+      }
+    },
+    "shadows": [
+      {
+        "value": "0 12px 35px -25px #000",
+        "name": "surface-dark",
+        "purpose": "深色普通玻璃面板。"
+      },
+      {
+        "value": "0 12px 35px -25px #23170c55",
+        "name": "surface-light",
+        "purpose": "浅色普通玻璃面板。"
+      },
+      {
+        "value": "0 15px 50px #0005",
+        "name": "appearance",
+        "purpose": "右上外观设置浮层。"
+      },
+      {
+        "value": "0 10px 35px #0004",
+        "name": "toast",
+        "purpose": "底部结果通知。"
+      },
+      {
+        "purpose": "原生操作弹窗；backdrop 为 #0009 及 5px 模糊。",
+        "name": "modal",
+        "value": "0 22px 70px #0008"
+      }
+    ],
+    "motion": [
+      {
+        "value": "0.15s",
+        "name": "control-transition",
+        "purpose": "按钮背景、工具按钮颜色和背景的变化。"
+      },
+      {
+        "value": "spin 1s linear infinite",
+        "name": "loading-spin",
+        "purpose": "加载旋转；不是装饰动画。"
+      },
+      {
+        "value": "animation:none!important;transition:none!important;scroll-behavior:auto!important",
+        "name": "reduced-motion",
+        "purpose": "prefers-reduced-motion:reduce 时应用于元素及伪元素。"
+      }
+    ],
+    "breakpoints": [
+      {
+        "value": "760px",
+        "name": "mobile",
+        "purpose": "max-width:760px；抽屉、两列资源卡、其余工作区单列。"
+      },
+      {
+        "value": "761px",
+        "name": "desktop",
+        "purpose": "min-width:761px；横向导航、四列资源卡。"
+      },
+      {
+        "value": "1180px",
+        "name": "compact-desktop-max",
+        "purpose": "761–1180px 保留紧凑导航规则；新增协议使用单列选择列表。"
+      }
+    ]
+  },
+  "components": [
+    {
+      "html": "<button class=\"ds-primary\">添加用户</button>",
+      "name": "主要按钮",
+      "css": ".ds-primary{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:34px;padding:7px 13px;border:1px solid var(--line,#ffffff14);border-radius:24px;background:var(--input,#ffffff08);font:600 12px \"Manrope Variable\",\"Microsoft YaHei\",\"PingFang SC\",sans-serif;color:var(--text,#f4f2ef);cursor:pointer;transition:background .15s,transform .15s; background:var(--primary,#e5ab7d);color:var(--bg,#0b0b0b);border-color:transparent}.ds-primary:hover{background:var(--primary-hover,#f0bb91)}.ds-primary:focus-visible{outline:2px solid var(--primary,#e5ab7d);outline-offset:4px;}.ds-primary:disabled{cursor:not-allowed;opacity:.45}@media(prefers-reduced-motion:reduce){.ds-primary{transition:none}}",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "保存、新建及原生Linux面板更新等主要动作。更新需确认；忙碌、已提交、下载或应用中禁用，不将提交成功表述为升级完成。"
+    },
+    {
+      "html": "<button class=\"ds-secondary\">普通创建</button>",
+      "name": "次要按钮",
+      "css": ".ds-secondary{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:34px;padding:7px 13px;border:1px solid var(--line,#ffffff14);border-radius:24px;background:var(--input,#ffffff08);font:600 12px \"Manrope Variable\",\"Microsoft YaHei\",\"PingFang SC\",sans-serif;color:var(--text,#f4f2ef);cursor:pointer;transition:background .15s,transform .15s;}.ds-secondary:hover{background:var(--tint,#e5ab7d18)}.ds-secondary:focus-visible{outline:2px solid var(--primary,#e5ab7d);outline-offset:4px;}.ds-secondary:disabled{cursor:not-allowed;opacity:.45}@media(prefers-reduced-motion:reduce){.ds-secondary{transition:none}}",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "普通创建、转为普通创建、检查面板版本等次级动作。检查显示忙碌并就地反馈失败；源码和Docker也可检查版本。"
+    },
+    {
+      "html": "<button class=\"ds-icon\" aria-label=\"关闭外观设置\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" aria-hidden=\"true\"><path d=\"m18 6-12 12M6 6l12 12\"/></svg></button>",
+      "name": "圆形工具按钮",
+      "css": ".ds-icon{display:inline-flex;align-items:center;justify-content:center;width:31px;height:31px;border:1px solid var(--line,#ffffff14);background:var(--input,#ffffff08);border-radius:50%;color:var(--muted,#b5afa7);cursor:pointer;transition:background .15s,color .15s;}.ds-icon:hover{color:var(--text,#f4f2ef);background:var(--tint,#e5ab7d18)}.ds-icon:focus-visible{outline:2px solid var(--primary,#e5ab7d);outline-offset:4px;}.ds-icon:disabled{cursor:not-allowed;opacity:.45}@media(prefers-reduced-motion:reduce){.ds-icon{transition:none}}",
+      "kind": "button",
+      "refersTo": "button-icon",
+      "description": "带中文名称的关闭、编辑与面板工具。"
+    },
+    {
+      "html": "<div class=\"ds-field\"><div class=\"ds-field-label\"><label for=\"ds-help-input\">服务器名称（SNI）</label><button type=\"button\" class=\"ds-help-toggle\" aria-label=\"解释 服务器名称（SNI）\" aria-expanded=\"true\" aria-controls=\"ds-help-note\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3m.1 4h.01\"/></svg></button></div><div class=\"ds-help-note\" id=\"ds-help-note\" role=\"note\">TLS 握手的服务器名称，需与证书匹配。REALITY 通常使用握手目标域名，不含端口。</div><input id=\"ds-help-input\" class=\"ds-input\" aria-describedby=\"ds-help-note\" placeholder=\"node.example.com\"/></div>",
+      "name": "字段与展开帮助",
+      "css": ".ds-field{margin-bottom:13px;display:flex;flex-direction:column;gap:6px;color:var(--text,#f4f2ef);font:550 12px 'Manrope Variable','Microsoft YaHei','PingFang SC',sans-serif}.ds-input{padding:9px 11px;border:1px solid var(--line,#ffffff14);border-radius:8px;background:var(--input,#ffffff08);color:var(--text,#f4f2ef);font:14px 'Manrope Variable','Microsoft YaHei','PingFang SC',sans-serif;outline:none;caret-color:var(--primary,#e5ab7d)}.ds-input::placeholder{color:var(--muted,#b5afa7);opacity:1}.ds-input:focus{border-color:var(--primary,#e5ab7d);box-shadow:0 0 0 3px color-mix(in srgb,var(--primary,#e5ab7d) 13%,transparent)}.ds-field-label{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:550;position:relative}.ds-help-toggle{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;padding:0;border:0;background:transparent;color:var(--muted,#b5afa7);border-radius:50%;cursor:pointer}.ds-help-toggle[aria-expanded=true]{color:var(--primary,#e5ab7d)}.ds-help-toggle:focus-visible{outline:2px solid var(--primary,#e5ab7d);outline-offset:4px;}.ds-help-note{background:var(--input,#ffffff08);border:1px solid var(--line,#ffffff14);border-radius:8px;padding:9px 11px;font-size:12px;font-weight:400;color:var(--muted,#b5afa7);line-height:1.7;overflow-wrap:anywhere}",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "展开态静态预览。生产Field按名称补齐placeholder；问号按钮以aria-expanded切换正常流帮助，Escape先收起帮助，输入关联说明。"
+    },
+    {
+      "html": "<nav class=\"ds-nav\" aria-label=\"主要导航\"><button class=\"ds-nav-item ds-nav-active\" aria-current=\"page\">总览</button><button class=\"ds-nav-item\">协议入口</button><button class=\"ds-nav-item\">用户与订阅</button><button class=\"ds-nav-item\">域名与证书</button><button class=\"ds-nav-item\">系统设置</button></nav>",
+      "name": "横向导航",
+      "css": ".ds-nav{caret-color:transparent;border:1px solid var(--line,#ffffff14);border-radius:12px;padding:16px;background:color-mix(in srgb,var(--surface,#252522) var(--glass-opacity,72%),transparent);backdrop-filter:blur(var(--glass-blur,20px)) saturate(var(--glass-saturation,125%));box-shadow:var(--shadow,0 12px 35px -25px #000);color:var(--text,#f4f2ef); display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-height:52px}.ds-nav-item{user-select:none;display:flex;align-items:center;gap:8px;background:transparent;border:0;border-radius:22px;padding:9px 13px;font:12px 'Manrope Variable','Microsoft YaHei','PingFang SC',sans-serif;color:var(--muted,#b5afa7);cursor:pointer}.ds-nav-item:hover{background:var(--input,#ffffff08);color:var(--text,#f4f2ef)}.ds-nav-item.ds-nav-active{background:var(--primary,#e5ab7d);color:var(--bg,#0b0b0b);font-weight:750}.ds-nav-item:focus-visible{outline:2px solid var(--primary,#e5ab7d);outline-offset:4px;}",
+      "kind": "nav",
+      "refersTo": "navigation-active",
+      "description": "总览、协议入口、用户与订阅、域名与证书、系统设置构成主导航；伪装网站移入系统设置。选中主色胶囊，手机左抽屉。"
+    },
+    {
+      "html": "<section class=\"ds-surface\"><div class=\"ds-quota-heading\"><h2 class=\"ds-surface-title\">服务器流量</h2><span>全用户共享周期用量</span></div><div class=\"ds-quota\"><strong>0 B <small>/ 不限额</small></strong><span>服务器网卡监控需要 Linux /proc</span><progress aria-label=\"服务器周期用量\" max=\"1\" value=\"0\"></progress></div></section>",
+      "name": "服务器周期用量",
+      "css": ".ds-surface{border:1px solid var(--line,#ffffff14);border-radius:12px;padding:16px;background:color-mix(in srgb,var(--surface,#252522) var(--glass-opacity,72%),transparent);backdrop-filter:blur(var(--glass-blur,20px)) saturate(var(--glass-saturation,125%));box-shadow:var(--shadow,0 12px 35px -25px #000);color:var(--text,#f4f2ef); font-family:'Manrope Variable','Microsoft YaHei','PingFang SC',sans-serif}.ds-surface-title{font-size:15px;font-weight:650;letter-spacing:-.3px;margin:0 0 14px}.ds-surface-copy{font-size:12px;color:var(--muted,#b5afa7);line-height:1.7;margin:0}[data-glass=off] .ds-surface{background:var(--solid,#1b1b19);backdrop-filter:none}@media(max-width:760px){.ds-surface{padding:13px}}.ds-quota-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.ds-quota-heading .ds-surface-title{margin:0}.ds-quota-heading>span{font-size:12px;color:var(--muted,#b5afa7)}.ds-quota{display:grid;gap:8px;margin-bottom:14px}.ds-quota strong{font-size:22px;font-variant-numeric:tabular-nums}.ds-quota small{font-size:12px;color:var(--muted,#b5afa7)}.ds-quota>span{font-size:11px;color:var(--muted,#b5afa7)}.ds-quota progress{width:100%;height:6px;accent-color:var(--primary,#e5ab7d)}",
+      "kind": "card",
+      "refersTo": "surface",
+      "description": "沿用现有surface的周期额度展示；示例监控不可用，共享额度不强制停用。同一surface也承载系统设置的面板版本与更新，复用定义列表、部署徽标、按钮、状态消息，不新增材质。"
+    },
+    {
+      "html": "<article class=\"ds-resource\"><button class=\"ds-resource-action\" aria-label=\"查看域名证书\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7 17 17 7M7 7h10v10\"/></svg></button><span class=\"ds-resource-label\">域名证书</span><strong class=\"ds-resource-value\">0</strong><div class=\"ds-resource-detail\"><span>0 个系统来源</span><span>自动检测续期</span></div></article>",
+      "name": "内凹角资源卡",
+      "css": ".ds-resource{border:1px solid var(--line,#ffffff14);border-radius:12px;padding:16px;background:color-mix(in srgb,var(--surface,#252522) var(--glass-opacity,72%),transparent);backdrop-filter:blur(var(--glass-blur,20px)) saturate(var(--glass-saturation,125%));box-shadow:var(--shadow,0 12px 35px -25px #000);color:var(--text,#f4f2ef); position:relative;min-height:140px;padding:16px;border-top-right-radius:0;font-family:'Manrope Variable','Microsoft YaHei','PingFang SC',sans-serif}.ds-resource:before{content:'';position:absolute;right:-1px;top:-1px;width:52px;height:52px;background:var(--bg,#0b0b0b);border-bottom-left-radius:16px}.ds-resource:after{content:'';position:absolute;top:51px;right:-1px;width:14px;height:14px;border-top-right-radius:14px;box-shadow:4px -4px 0 3px var(--bg,#0b0b0b);pointer-events:none}.ds-resource-action{display:inline-flex;align-items:center;justify-content:center;width:31px;height:31px;border:1px solid var(--line,#ffffff14);background:var(--input,#ffffff08);border-radius:50%;color:var(--muted,#b5afa7);cursor:pointer;transition:background .15s,color .15s; position:absolute;right:0;top:0;z-index:1}.ds-resource-action:hover{color:var(--text,#f4f2ef);background:var(--tint,#e5ab7d18)}.ds-resource-action:focus-visible{outline:2px solid var(--primary,#e5ab7d);outline-offset:4px;}.ds-resource-label{display:block;padding-right:22px;font-size:12px;color:var(--muted,#b5afa7)}.ds-resource-value{display:block;font-size:30px;font-weight:700;letter-spacing:-1.2px;margin:12px 0;line-height:1.1;font-variant-numeric:tabular-nums}.ds-resource-detail{display:flex;justify-content:space-between;gap:10px;border-top:1px solid var(--line,#ffffff14);padding-top:10px;color:var(--muted,#b5afa7);font-size:10px}.ds-resource-detail>span:first-child{color:var(--text,#f4f2ef)}@media(max-width:760px){.ds-resource{padding:12px;min-height:132px}.ds-resource:before{width:38px;height:38px;border-bottom-left-radius:13px}.ds-resource:after{top:37px}.ds-resource-action{width:29px;height:29px}.ds-resource-label{font-size:10px}.ds-resource-value{font-size:27px}.ds-resource-detail{flex-direction:column;gap:4px;font-size:9px;padding-top:10px}}@media(prefers-reduced-motion:reduce){.ds-resource-action{transition:none}}",
+      "kind": "card",
+      "refersTo": "resource-card",
+      "description": "总览真实资源计数与快捷入口；第四卡为服务器周期流量，与代理时段图表区分。示例为无证书时零值。"
+    },
+    {
+      "html": "<span class=\"ds-badge\"><i aria-hidden=\"true\"></i>已启用</span>",
+      "name": "状态标签",
+      "css": ".ds-badge{display:inline-flex;align-items:center;gap:6px;color:#78cda1;font:11px \"Manrope Variable\",\"Microsoft YaHei\",\"PingFang SC\",sans-serif;white-space:nowrap}.ds-badge i{height:5px;width:5px;background:currentColor;border-radius:50%}:host-context([data-theme=light]) .ds-badge{color:#26734d}.ds-badge.ds-muted{color:var(--muted,#b5afa7)}",
+      "kind": "chip",
+      "refersTo": "status-badge",
+      "description": "小圆点与文字共同传达启用状态；停用使用次级文字色。"
+    },
+    {
+      "html": "<div class=\"ds-choices\"><label class=\"ds-choice\"><input type=\"radio\" name=\"ds-quick-protocol\" checked/><strong>VLESS + REALITY + Vision</strong><span>…</span><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"m20 6-11 11-5-5\"/></svg></label><label class=\"ds-choice\"><input type=\"radio\" name=\"ds-quick-protocol\"/><strong>VLESS + XHTTP + TLS</strong><span>…</span><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"m20 6-11 11-5-5\"/></svg></label><label class=\"ds-choice\"><input type=\"radio\" name=\"ds-quick-protocol\"/><strong>AnyTLS</strong><span>…</span><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"m20 6-11 11-5-5\"/></svg></label><label class=\"ds-choice\"><input type=\"radio\" name=\"ds-quick-protocol\"/><strong>Hysteria2</strong><span>…</span><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"m20 6-11 11-5-5\"/></svg></label></div>",
+      "css": ".ds-choices{display:grid;gap:7px;margin-bottom:10px;font-family:'Manrope Variable','Microsoft YaHei','PingFang SC',sans-serif;color:var(--text,#f4f2ef)}.ds-choice{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--input,#ffffff08);border:1px solid var(--line,#ffffff14);border-radius:9px;cursor:pointer}.ds-choice:has(input:checked){border-color:color-mix(in srgb,var(--primary,#e5ab7d) 65%,transparent);background:var(--tint,#e5ab7d18)}.ds-choice input{width:17px;height:17px;accent-color:var(--primary,#e5ab7d);flex-shrink:0}.ds-choice input:focus-visible{outline:2px solid var(--primary,#e5ab7d);outline-offset:4px;}.ds-choice strong{font-size:12px;font-weight:600;flex:1}.ds-choice span{font:12px ui-monospace,monospace;color:var(--muted,#b5afa7)}.ds-choice svg{display:none;color:var(--primary,#e5ab7d)}.ds-choice:has(input:checked) svg{display:block}@media(max-width:760px){.ds-choice{padding:10px;gap:7px}.ds-choice strong{font-size:11px}}",
+      "refersTo": "protocol-option",
+      "description": "四项预设固定顺序，每次单选一项；主色radio为17px。可携带当前协议、端口、域名、证书、REALITY与用户参数转普通创建。",
+      "kind": "custom",
+      "name": "快速预设单选列表"
+    },
+    {
+      "html": "<dialog open class=\"ds-modal\" aria-labelledby=\"ds-modal-title\"><div class=\"ds-modal-heading\"><h2 id=\"ds-modal-title\">重置订阅链接</h2><button class=\"ds-modal-close\" aria-label=\"关闭弹窗\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" aria-hidden=\"true\"><path d=\"m18 6-12 12M6 6l12 12\"/></svg></button></div><div class=\"ds-modal-content\"><p class=\"ds-confirm-message\">旧订阅地址立即失效，已导入的节点凭据保持不变。请提供新订阅地址。</p><div class=\"ds-modal-actions\"><button class=\"ds-modal-cancel\">取消</button><button class=\"ds-modal-save\">确认重置</button></div></div></dialog>",
+      "css": ".ds-modal{position:relative;margin:0;width:min(660px,calc(100vw - 32px));max-width:100%;max-height:calc(100dvh - 48px);padding:0;color:var(--text,#f4f2ef);background:var(--solid,#1b1b19);border:1px solid var(--line,#ffffff14);border-radius:14px;box-shadow:0 22px 70px #0008;overflow:auto;overscroll-behavior:contain;font-family:'Manrope Variable','Microsoft YaHei','PingFang SC',sans-serif}.ds-modal::backdrop{background:#0009;backdrop-filter:blur(5px)}.ds-modal-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line,#ffffff14);position:sticky;top:0;z-index:2;background:var(--solid,#1b1b19)}.ds-modal-heading h2{font-size:16px;font-weight:650;margin:0;letter-spacing:-.3px}.ds-modal-close{display:inline-flex;align-items:center;justify-content:center;width:31px;height:31px;border:1px solid var(--line,#ffffff14);background:var(--input,#ffffff08);border-radius:50%;color:var(--muted,#b5afa7);cursor:pointer;transition:background .15s,color .15s;}.ds-modal-close:hover{color:var(--text,#f4f2ef);background:var(--tint,#e5ab7d18)}.ds-modal-close:focus-visible,.ds-modal-save:focus-visible{outline:2px solid var(--primary,#e5ab7d);outline-offset:4px;}.ds-modal-content{padding:16px 18px}.ds-modal-field{display:flex;flex-direction:column;gap:6px;margin-bottom:13px;font-size:12px;font-weight:550}.ds-modal-field input{padding:9px 11px;border:1px solid var(--line,#ffffff14);border-radius:8px;background:var(--input,#ffffff08);color:var(--text,#f4f2ef);font:14px 'Manrope Variable','Microsoft YaHei','PingFang SC',sans-serif;outline:none;caret-color:var(--primary,#e5ab7d)}.ds-modal-field input::placeholder{color:var(--muted,#b5afa7)}.ds-modal-field input:focus{border-color:var(--primary,#e5ab7d);box-shadow:0 0 0 3px color-mix(in srgb,var(--primary,#e5ab7d) 13%,transparent)}.ds-modal-actions{gap:8px;display:flex;justify-content:flex-end;border-top:1px solid var(--line,#ffffff14);padding-top:12px;padding-bottom:12px;margin-top:14px;position:sticky;bottom:-16px;background:var(--solid,#1b1b19);z-index:1}.ds-modal-save{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:34px;padding:7px 13px;border:1px solid var(--line,#ffffff14);border-radius:24px;background:var(--input,#ffffff08);font:600 12px \"Manrope Variable\",\"Microsoft YaHei\",\"PingFang SC\",sans-serif;color:var(--text,#f4f2ef);cursor:pointer;transition:background .15s,transform .15s; background:var(--primary,#e5ab7d);color:var(--bg,#0b0b0b);border-color:transparent}.ds-modal-save:hover{background:var(--primary-hover,#f0bb91)}@media(max-width:760px){.ds-modal{width:calc(100vw - 20px);max-height:calc(100dvh - 24px);padding:13px}.ds-modal-heading{padding:11px 13px}.ds-modal-heading h2{font-size:15px}.ds-modal-content{padding:13px}.ds-modal-actions{gap:8px;bottom:-13px}.ds-modal-save{width:100%}}@media(prefers-reduced-motion:reduce){.ds-modal-close,.ds-modal-save{transition:none}}.ds-confirm-message{font-size:13px;line-height:1.8}.ds-modal-cancel{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:7px 13px;border:1px solid var(--line,#ffffff14);border-radius:24px;background:var(--input,#ffffff08);font:600 12px \"Manrope Variable\",\"Microsoft YaHei\",\"PingFang SC\",sans-serif;color:var(--text,#f4f2ef);cursor:pointer;transition:background .15s,transform .15s}.ds-modal-cancel:hover{background:var(--tint,#e5ab7d18)}.ds-modal-cancel:focus-visible{outline:2px solid var(--primary,#e5ab7d);outline-offset:4px;}.ds-modal-cancel:disabled,.ds-modal-save:disabled{cursor:not-allowed;opacity:.45}@media(max-width:760px){.ds-modal-cancel{width:100%}}@media(prefers-reduced-motion:reduce){.ds-modal-cancel{transition:none}}",
+      "refersTo": "modal",
+      "description": "ConfirmDialog复用Modal的静态预览；用于重置链接/凭据及原生Linux手动更新或开启自动更新。更新确认说明连接中断、可能重新登录、失败回退；请求中阻止关闭，失败留在弹窗。",
+      "kind": "custom",
+      "name": "确认操作弹窗"
+    }
+  ],
+  "narrative": {
+    "overview": "暖黑背景承托半透明暖灰玻璃，香槟橙只在品牌容器、当前导航和主要操作上形成清晰落点。低饱和琥珀折光、细边框和柔和阴影让面板具备可见层次；文字、状态和真实数据始终优先于材质表现。\n\n视觉方向沿用用户指定的 Glassmorphism Admin Panel 参考：顶部品牌栏与横向玻璃导航、内凹角资源卡、圆形工具按钮。PrismFlow 保留原创玻璃棱镜与多路流线 SVG 标志；简体中文为默认语言。本轮以更紧凑的间距和字号提高管理密度，创建与编辑集中在原生弹窗，页面只保留当前任务需要的说明。",
+    "donts": [
+      "**Don't** 恢复绿色常驻侧栏，或以另一套配色替代已确定的参考方向。",
+      "**Don't** 用假流量、演示成功率或装饰曲线填充真实管理页面。",
+      "**Don't** 引入全局发布按钮，或把证书签发变成所有协议的必经步骤。",
+      "**Don't** 恢复页面内展开的新建长表单、旧三列预设卡或重复的大段解释。",
+      "**Don't** 让玻璃滤镜遮蔽正文、焦点、错误或当前选中状态。",
+      "**Don't** 把参考项目的品牌标志替换进 PrismFlow，或让每个面板都重复资源卡凹角。"
+    ],
+    "northStar": "暖黑棱镜工作台",
+    "keyCharacteristics": [
+      "暖黑与香槟橙形成主层级，浅色主题使用暖白与深棕。",
+      "桌面横向导航和四列资源卡，移动端抽屉与两列资源卡。",
+      "模糊、不透明度和饱和度可实时调整，偏好保存在当前浏览器。",
+      "保存后自动校验并应用，数据与空状态均来自真实服务状态。",
+      "紧凑列表承载日常管理，新增弹窗承载输入、检测与就地错误反馈。"
+    ],
+    "dos": [
+      "**Do** 保持暖黑、香槟橙、横向玻璃导航与原创棱镜标志的已确认方向。",
+      "**Do** 用真实数据、零值和说明完整的空状态表达服务状态。",
+      "**Do** 为圆形工具按钮提供中文名称，为表单、模态弹窗、抽屉和外观面板保留清晰键盘焦点。",
+      "**Do** 让用户看见协议分配、证书来源和保存反馈，并延续保存后自动应用的流程。",
+      "**Do** 同时检查深色、浅色和手机布局；手机资源卡两列，其余主要工作区单列。",
+      "**Do** 以紧凑样式的最终层叠值扩展组件；新增使用弹窗，说明靠近当前字段与操作。"
+    ],
+    "rules": [
+      {
+        "section": "colors",
+        "name": "The 单一强调 Rule",
+        "body": "新页面使用现有橙色主层级；状态绿用于状态或图表，不扩展为绿色侧栏或主导航。"
+      }
+    ]
+  }
+}

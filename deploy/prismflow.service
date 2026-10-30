@@ -1,0 +1,28 @@
+[Unit]
+Description=PrismFlow Mihomo Server Manager
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=prismflow
+Group=prismflow
+WorkingDirectory=/var/lib/prismflow
+EnvironmentFile=-/etc/prismflow/environment
+Environment=PRISMFLOW_INSTALL_MODE=native
+ExecStart=/usr/local/bin/prismflow --data /var/lib/prismflow --core /opt/prismflow/mihomo
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/prismflow /var/lib/prismflow-updater/requests
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+LimitNOFILE=65536
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,11 @@
+[Unit]
+Description=Check PrismFlow stable updates hourly when enabled
+
+[Timer]
+OnCalendar=hourly
+RandomizedDelaySec=10m
+Persistent=true
+Unit=prismflow-update.service
+
+[Install]
+WantedBy=timers.target

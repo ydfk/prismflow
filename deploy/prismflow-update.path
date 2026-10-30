@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch administrator PrismFlow update requests
+
+[Path]
+PathExists=/var/lib/prismflow-updater/requests/request
+Unit=prismflow-update.service
+
+[Install]
+WantedBy=multi-user.target

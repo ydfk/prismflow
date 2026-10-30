@@ -1,0 +1,14 @@
+[Unit]
+Description=PrismFlow verified native updater
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/prismflow/update.sh run
+User=root
+UMask=0077
+NoNewPrivileges=true
+ProtectHome=true
+PrivateTmp=true
+TimeoutStartSec=15min

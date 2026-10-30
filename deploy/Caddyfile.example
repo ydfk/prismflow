@@ -1,0 +1,20 @@
+# 将示例域名替换为你自己的域名，并配置 DNS A/AAAA 记录。
+panel.example.com {
+    reverse_proxy 127.0.0.1:8080
+}
+
+connect.example.com {
+    reverse_proxy 127.0.0.1:8081
+}
+
+# 当代理协议使用公网 TCP 443 时，请把 Caddy 放在不同 IP / 主机，
+# 或为代理入口选择其他端口。不要让两者竞争同一个监听地址。
+# HTTP-01 的 node.example.com 验证可单独配置：
+http://node.example.com {
+    handle /.well-known/acme-challenge/* {
+        reverse_proxy 127.0.0.1:8081
+    }
+    handle {
+        reverse_proxy 127.0.0.1:8081
+    }
+}

@@ -1,0 +1,26 @@
+/.cache/
+/data/
+/bin/
+/dist/
+/web/node_modules/
+/web/dist/
+/web/test-results/
+/web/playwright-report/
+/internal/webui/dist/assets/
+/internal/webui/dist/index.html
+/internal/webui/dist/logo.svg
+/internal/webui/dist/favicon.svg
+*.log
+.env
+web/*.tsbuildinfo
+/.impeccable/*
+!/.impeccable/design.json
+third_party/mihomo/assets/*.gz
+
+/prismflow
+/prismflow.exe
+
+# 本地编辑器/构建备份不进入首次提交。
+/prismflow.exe~
+*.swp
+*~
