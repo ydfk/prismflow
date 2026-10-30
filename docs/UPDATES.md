@@ -16,7 +16,7 @@ curl -fsSL https://github.com/ydfk/prismflow/releases/latest/download/install.sh
 curl -fsSL https://github.com/ydfk/prismflow/releases/latest/download/install.sh | sudo bash -s -- --mode docker
 ```
 
-原生模式下载对应 amd64/arm64 Release 归档并校验 SHA-256，需要 Debian 12/13、Ubuntu 22.04/24.04 和 systemd。Docker 模式从 Docker Hub 拉取 `ydfk/prismflow`，Docker 根据宿主架构选择镜像；上述系统缺少 Docker 时会配置官方 APT 仓库并安装 Engine/Compose 插件。
+原生模式下载对应 amd64/arm64 Release 归档并校验 SHA-256，需要 Debian 12/13、Ubuntu 22.04/24.04 和 systemd。Docker 模式从 Docker Hub 拉取 `ydfk/prismflow`，当前仅支持 x86_64（amd64），ARM64 仍可使用原生版本；上述系统缺少 Docker 时会配置官方 APT 仓库并安装 Engine/Compose 插件。
 
 指定版本可追加 `--version v1.2.3`；原生模式可追加 `--auto-update`。默认从最新稳定 GitHub Release 选择确切版本，不自动选择预发布；指定预发布 Tag 则允许安装对应版本。首次发布前没有可下载的安装器或可拉取的 Hub 镜像。
 
@@ -77,7 +77,7 @@ sudo journalctl -u prismflow-update.service -n 100 --no-pager
 
 ## Tag 发布流程
 
-默认分支为 main。main 推送与 PR 只验证，不构建发布镜像或上传 Docker Hub。只有 main 历史中的合法版本 Tag 才运行 Release 工作流。
+默认分支为 main。不设置独立 CI；main 推送与 PR 不触发构建或测试。只有 main 历史中的合法版本 Tag 才运行 Release 工作流。
 
 先在 GitHub 仓库 **Settings → Secrets and variables → Actions** 配置：
 
@@ -100,7 +100,7 @@ git push origin v1.2.3
 | `v1.2.3` | `1.2.3`、`1.2`、`1`、`latest` | 正式版 |
 | `v1.3.0-rc.1` | `1.3.0-rc.1` | 预发布；不更新稳定别名 |
 
-流程先校验、测试并构建双架构原生包，再通过 Buildx/QEMU 构建并推送 `linux/amd64,linux/arm64` 的完整版本镜像。GitHub 安装资源先上传草稿，完成后公开；只有正式 Release 公开后，独立任务才用同一镜像 digest 更新稳定别名。若仅别名更新失败，在 Actions 选择“重新运行失败的作业”，无需重建已公开版本。
+流程仅保留 Tag 校验、前端构建、原生安装包打包和 Docker Hub 发布；不运行单元测试、race、协议集成测试或浏览器测试。原生包保持 amd64/arm64，Docker 只构建并推送 `linux/amd64`，无需 QEMU。GitHub 安装资源先上传草稿，完成后公开；只有正式 Release 公开后，独立任务才用同一镜像 digest 更新稳定别名。若仅别名更新失败，在 Actions 选择“重新运行失败的作业”，无需重建已公开版本。
 
 GitHub Release 内容：
 
@@ -113,4 +113,6 @@ GitHub Release 内容：
 
 Docker 镜像只分发到 Docker Hub，不再上传 prismflow-docker 架构 tar 包。面板内显示版本与 Tag 一致，例如 v1.2.3 对应 1.2.3。
 
-发布实现参考 [caddy-pilot 的 Docker Hub 工作流](https://github.com/ydfk/caddy-pilot/blob/main/.github/workflows/docker-publish.yml)；多架构构建与清单别名使用 [Docker 官方 Actions 文档](https://docs.docker.com/build/ci/github-actions/multi-platform/) 和 [imagetools create](https://docs.docker.com/reference/cli/docker/buildx/imagetools/create/)。真实推送需要 GitHub Secrets 和版本 Tag，本地脚本/配置检查不等同于 Docker Hub 发布成功。
+下载发布产物时按名称只取 `native`，Docker 构建记录上传已关闭，避免将 `.dockerbuild` 记录当作 ZIP 安装产物解压。修复后的工作流需由包含修复的新 Tag 触发；重跑旧 Tag 的失败任务仍使用当时的提交，详见 [GitHub 重跑说明](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs)。
+
+发布方式参考 [caddy-pilot 的 Docker Hub 工作流](https://github.com/ydfk/caddy-pilot/blob/main/.github/workflows/docker-publish.yml)；产物筛选依据 [Docker build-push-action 的构建记录说明](https://github.com/docker/build-push-action#summaries)。真实推送需要 GitHub Secrets 和版本 Tag，本地配置检查不等同于远程发布成功。

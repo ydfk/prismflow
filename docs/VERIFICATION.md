@@ -79,3 +79,8 @@ TypeScript/Vite 构建和 Chromium 7 项回归通过，覆盖分类显示、字�
 Docker 发布改为 Tag 触发的 ydfk/prismflow 多架构镜像，GitHub Release 只保留原生包、安装器、Compose 与校验清单。仓库默认 Compose 拉取 Hub，源码构建需显式使用 compose.build.yaml。
 
 Actions 语法与 Compose 配置解析通过。一次性 root 容器的 mock 安装测试覆盖 Hub 拉取、旧离线安装迁移、配置/数据保留、拉取失败不重建、Compose 镜像不匹配拒绝、启动命令失败恢复旧镜像、安装文件校验与预发布显式安装。真实 Hub 登录/推送、多架构公开清单和首次 Release 尚需配置 GitHub Secrets 并推送版本 Tag 后验证；本轮没有发布版本或上传镜像。
+## 2026-10-30 精简发布流程与产物修复
+
+按用户要求删除独立 CI，并从 Release 移除单元测试、race、协议探测和 Playwright 阶段，仅在版本 Tag 推送时构建发布。Docker 改为 linux/amd64，去掉 QEMU；原生包继续 amd64/arm64。下载阶段指定 name: native，构建阶段关闭 DOCKER_BUILD_RECORD_UPLOAD，避免将 .dockerbuild 记录误作 ZIP 解压。安装器在网络或系统变更前拒绝 ARM64 Docker 模式。
+
+本地 Actions 语法、Shell 语法和安装脚本回归通过。未重跑旧 v0.1.0 任务，因为重跑仍绑定旧提交；修复的远程发布需使用包含修复的新 Tag。

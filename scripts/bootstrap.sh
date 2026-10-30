@@ -21,6 +21,8 @@ if [[ -z "$MODE" ]]; then
 fi
 [[ "$MODE" == native || "$MODE" == docker ]] || { echo '安装方式应为 native 或 docker。' >&2; exit 1; }
 if [[ "$MODE" == docker && "$AUTO" == 1 ]]; then echo '--auto-update 仅适用于原生版本。' >&2; exit 1; fi
+case "$(uname -m)" in x86_64|amd64) ARCH=amd64 ;; aarch64|arm64) ARCH=arm64 ;; *) echo '仅支持 amd64 / arm64。' >&2; exit 1 ;; esac
+if [[ "$MODE" == docker && "$ARCH" != amd64 ]]; then echo 'Docker 镜像暂时仅支持 x86_64（amd64）；ARM64 请使用原生安装。' >&2; exit 1; fi
 source /etc/os-release
 supported() { case "$ID:$VERSION_ID" in debian:12|debian:13|ubuntu:22.04|ubuntu:24.04) return 0 ;; *) return 1 ;; esac; }
 if [[ "$MODE" == native ]]; then
@@ -45,7 +47,6 @@ jq -e '.draft == false and (.tag_name | type == "string")' <<<"$metadata" >/dev/
 if [[ "$REQUESTED_VERSION" == latest ]]; then jq -e '.prerelease == false' <<<"$metadata" >/dev/null; fi
 TAG=$(jq -r .tag_name <<<"$metadata")
 [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || exit 1
-case "$(uname -m)" in x86_64|amd64) ARCH=amd64 ;; aarch64|arm64) ARCH=arm64 ;; *) echo '仅支持 amd64 / arm64。' >&2; exit 1 ;; esac
 BASE="https://github.com/ydfk/prismflow/releases/download/$TAG"
 fetch() { curl -fsSL --retry 3 --connect-timeout 15 --max-time 600 "$BASE/$1" -o "$WORK/$1"; }
 verify() {
@@ -80,7 +81,7 @@ else
   if [[ -f /opt/prismflow/compose.yaml ]]; then COMPOSE=/opt/prismflow/compose.yaml; fi
   resolved=$(PRISMFLOW_IMAGE="$IMAGE" docker compose -f "$COMPOSE" config --format json)
   jq -e --arg image "$IMAGE" '.services.prismflow.image == $image' <<<"$resolved" >/dev/null || { echo '现有 Compose 未使用 PRISMFLOW_IMAGE；请先调整镜像配置，原部署未改动。' >&2; exit 1; }
-  # 成功拉取后才操作部署；Docker 根据宿主架构选择多架构清单。
+  # 成功拉取后才操作部署；当前 Docker 镜像仅提供 x86_64 / amd64。
   docker pull "$IMAGE"
   install -d -m 0755 /opt/prismflow
   if [[ ! -d /opt/prismflow/data ]]; then install -d -o 10001 -g 10001 -m 0700 /opt/prismflow/data; fi

@@ -65,7 +65,7 @@ PrismFlow 面向个人与小团队的单台 VPS，使用 **Go + SQLite**，将 R
 
 根据部署方式选择下方的 **本地（原生）安装** 或 **Docker 安装** 命令，执行后直接安装，无需再交互选择。
 
-安装器自动识别 amd64 / arm64，下载最新稳定 Release，校验 SHA-256 并完成部署。首次安装需等待首个版本 Tag 的 Release 工作流完成；没有可用 Release 时会明确提示。
+原生安装器支持 amd64 / arm64；Docker 镜像暂时仅支持 x86_64（amd64）。安装器选择最新稳定 Release 并完成部署，GitHub 安装资源校验 SHA-256。首次安装需等待首个版本 Tag 的 Release 工作流完成；没有可用 Release 时会明确提示。
 
 ### 脚本安装
 
@@ -114,7 +114,7 @@ Docker 版使用独立的一键命令，执行后直接安装：
 curl -fsSL https://github.com/ydfk/prismflow/releases/latest/download/install.sh | sudo bash -s -- --mode docker
 ```
 
-安装器从 Docker Hub 拉取 [`ydfk/prismflow`](https://hub.docker.com/r/ydfk/prismflow) 的确切版本，自动选择 amd64/arm64，不需要在 VPS 编译源码。上述 Debian / Ubuntu 系统未安装 Docker 时，会从 Docker 官方 APT 仓库安装 Engine 与 Compose 插件。
+安装器从 Docker Hub 拉取 [`ydfk/prismflow`](https://hub.docker.com/r/ydfk/prismflow) 的确切版本，目前仅支持 x86_64（amd64），不需要在 VPS 编译源码。上述 Debian / Ubuntu 系统未安装 Docker 时，会从 Docker 官方 APT 仓库安装 Engine 与 Compose 插件。
 
 | 位置 | 用途 |
 | --- | --- |
@@ -273,7 +273,7 @@ go test ./...
 go vet ./...
 ```
 
-真实内核与浏览器验证的准备方式见 [验收记录](docs/VERIFICATION.md) 和 [CI 工作流](.github/workflows/ci.yml)。systemd 目标系统、公网 CA、ARM64 硬件和长期负载的验收状态以该记录为准。
+可按 [验收记录](docs/VERIFICATION.md) 在本地执行真实内核与浏览器验证。GitHub Actions 仅在版本 Tag 推送时构建 Release 和 Docker 镜像，不运行独立 CI 或测试流水线。systemd 目标系统、公网 CA、ARM64 硬件和长期负载的验收状态以该记录为准。
 
 ---
 

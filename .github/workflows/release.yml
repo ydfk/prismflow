@@ -39,22 +39,6 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - run: npm ci && npm run build
         working-directory: web
-      - run: go test -race ./... && go vet ./...
-      - run: for script in scripts/*.sh; do bash -n "$script"; done
-      - run: docker run --rm --user 0 --mount type=bind,source="$PWD",target=/workspace,readonly golang:1.25-bookworm bash /workspace/scripts/test-install.sh
-      - run: go build -o .cache/prismflow ./cmd/prismflow
-      - run: .cache/prismflow install-core --output .cache/mihomo
-      - run: MIHOMO_BINARY="$PWD/.cache/mihomo" go test ./internal/core -run Integration -v
-      - name: Verify Caddy and Nginx XHTTP
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y caddy nginx
-          sudo systemctl stop caddy nginx
-          MIHOMO_BINARY="$PWD/.cache/mihomo" PRISMFLOW_REVERSE_PROXY_TEST=1 go test ./internal/server -run Integration -v
-      - run: npx playwright install --with-deps chromium
-        working-directory: web
-      - run: npm run test:e2e
-        working-directory: web
       - name: Build versioned native archives
         env:
           VERSION: ${{ github.ref_name }}
@@ -79,7 +63,6 @@ jobs:
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
           [[ -n "$DOCKERHUB_USERNAME" && -n "$DOCKERHUB_TOKEN" ]] || { echo '请配置 DOCKERHUB_USERNAME 与 DOCKERHUB_TOKEN，账户需有 ydfk/prismflow 推送权限。' >&2; exit 1; }
-      - uses: docker/setup-qemu-action@v4
       - uses: docker/setup-buildx-action@v4
       - uses: docker/login-action@v4
         with:
@@ -91,9 +74,11 @@ jobs:
       - name: Build and push versioned Docker Hub image
         id: image
         uses: docker/build-push-action@v7
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: 'false'
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: true
           build-args: VERSION=${{ github.ref_name }}
           tags: ydfk/prismflow:${{ steps.version.outputs.tag }}
@@ -113,8 +98,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
+          name: native
           path: dist
-          merge-multiple: true
       - name: Prepare installer and checksums
         run: |
           cp scripts/bootstrap.sh dist/install.sh
@@ -162,4 +147,4 @@ jobs:
           version=${TAG#v}
           major=${version%%.*}
           minor=${version%.*}
-          docker buildx imagetools create --tag "ydfk/prismflow:$major" --tag "ydfk/prismflow:$minor" --tag ydfk/prismflow:latest "ydfk/prismflow@$DIGEST"
+          docker buildx imagetools create --prefer-index=false --tag "ydfk/prismflow:$major" --tag "ydfk/prismflow:$minor" --tag ydfk/prismflow:latest "ydfk/prismflow@$DIGEST"

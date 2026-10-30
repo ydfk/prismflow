@@ -119,4 +119,13 @@ printf 'v1.3.0-rc.1\n' > "$FIXTURES/latest"
 if bash "$SOURCE/scripts/bootstrap.sh" --mode docker;then echo 'latest 接受了预发布' >&2;exit 1;fi
 bash "$SOURCE/scripts/bootstrap.sh" --mode docker --version v1.3.0-rc.1
 [[ $(cat /opt/prismflow/image-version) == ydfk/prismflow:1.3.0-rc.1 && $(cat /opt/prismflow/data/sentinel) == docker-data ]]
-echo 'PASS: native install/update; Docker Hub pull/migration/failure recovery; prerelease pinning, checksums, privileges and data preservation'
+# Docker 不再发布 ARM64，安装器必须在下载或系统修改之前拒绝。
+cat > "$WORK/bin/uname" <<'MOCK'
+#!/usr/bin/env bash
+if [[ "$1" == -m ]];then echo aarch64;else /usr/bin/uname "$@";fi
+MOCK
+chmod +x "$WORK/bin/uname"
+before=$(wc -l < "$MOCK_API")
+if bash "$SOURCE/scripts/bootstrap.sh" --mode docker;then echo 'ARM64 Docker 安装未被拒绝' >&2;exit 1;fi
+[[ $(wc -l < "$MOCK_API") == "$before" ]]
+echo 'PASS: native updates; amd64 Docker Hub install/migration/recovery; ARM64 Docker rejection; checksums and data preservation'
