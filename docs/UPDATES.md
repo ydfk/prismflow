@@ -1,15 +1,18 @@
 # 安装、版本发布与更新
 
-## 一条命令安装
+## 一键安装
 
-```bash
-curl -fsSL https://github.com/ydfk/prismflow/releases/latest/download/install.sh | sudo bash
-```
+选择对应命令直接安装，无需交互选择。
 
-在终端选择 1 原生 / 2 Docker。无人值守可使用：
+**本地（原生）版本**
 
 ```bash
 curl -fsSL https://github.com/ydfk/prismflow/releases/latest/download/install.sh | sudo bash -s -- --mode native
+```
+
+**Docker 版本**
+
+```bash
 curl -fsSL https://github.com/ydfk/prismflow/releases/latest/download/install.sh | sudo bash -s -- --mode docker
 ```
 

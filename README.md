@@ -63,17 +63,13 @@ PrismFlow 面向个人与小团队的单台 VPS，使用 **Go + SQLite**，将 R
 
 ## 一键安装
 
-在 VPS 运行下面一条命令，按提示选择 **原生版本** 或 **Docker 版本**：
-
-```bash
-curl -fsSL https://github.com/ydfk/prismflow/releases/latest/download/install.sh | sudo bash
-```
+根据部署方式选择下方的 **本地（原生）安装** 或 **Docker 安装** 命令，执行后直接安装，无需再交互选择。
 
 安装器自动识别 amd64 / arm64，下载最新稳定 Release，校验 SHA-256 并完成部署。首次安装需等待首个版本 Tag 的 Release 工作流完成；没有可用 Release 时会明确提示。
 
 ### 脚本安装
 
-原生版本适用于 **Debian 12 / 13、Ubuntu 22.04 / 24.04**，需要 systemd。无需手动下载或编译：
+本地（原生）版本适用于 **Debian 12 / 13、Ubuntu 22.04 / 24.04**，需要 systemd。无需手动下载或编译：
 
 ```bash
 curl -fsSL https://github.com/ydfk/prismflow/releases/latest/download/install.sh | sudo bash -s -- --mode native
@@ -112,7 +108,7 @@ sudo bash scripts/install.sh ./prismflow
 
 ### Docker 安装
 
-同一个安装器选择 Docker 即可；非交互安装使用：
+Docker 版使用独立的一键命令，执行后直接安装：
 
 ```bash
 curl -fsSL https://github.com/ydfk/prismflow/releases/latest/download/install.sh | sudo bash -s -- --mode docker
