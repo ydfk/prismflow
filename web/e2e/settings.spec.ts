@@ -1,0 +1,28 @@
+import {test,expect} from '@playwright/test'
+import {resolve} from 'node:path'
+
+test('设置分类、键盘导航、草稿保留、品牌统一与平级菜单',async({page})=>{
+ await page.goto('/');await page.getByLabel('用户名',{exact:true}).fill('admin');await page.getByLabel('密码',{exact:true}).fill('PrismFlow-E2E-password-123');await page.getByRole('button',{name:'登录工作台',exact:true}).click()
+ await expect(page.locator('.nav-item .lucide-chevron-down')).toHaveCount(0)
+ const favicon=await page.locator('link[rel=icon]').getAttribute('href')
+ await expect(page.locator('.brand img')).toHaveAttribute('src',favicon!)
+ expect(await page.locator('.brand img').evaluate(e=>getComputedStyle(e).filter)).toBe('none')
+ await page.getByRole('button',{name:'系统设置',exact:true}).click()
+ const tabs=page.getByRole('tablist',{name:'系统设置分类'})
+ await expect(tabs.getByRole('tab')).toHaveText(['服务管理','流量与记录','伪装网站','安全与备份'])
+ await expect(page.getByRole('heading',{name:'Mihomo 内核',exact:true})).toBeVisible()
+ await expect(page.getByLabel('每月流量上限（GiB）',{exact:true})).toBeHidden()
+ const service=tabs.getByRole('tab',{name:'服务管理',exact:true});await service.focus();await page.keyboard.press('ArrowRight')
+ await expect(tabs.getByRole('tab',{name:'流量与记录',exact:true})).toBeFocused()
+ await expect(page.getByRole('heading',{name:'历史记录',exact:true})).toBeVisible()
+ await page.getByLabel('流量历史保留天数',{exact:true}).fill('45');await page.getByRole('button',{name:'保存历史设置',exact:true}).click();await expect(page.getByText('历史记录设置已保存',{exact:true})).toBeVisible()
+ await page.screenshot({path:resolve('../docs/screenshots/settings-traffic.png'),fullPage:true,animations:'disabled'})
+ await tabs.getByRole('tab',{name:'伪装网站',exact:true}).click();const title=page.getByLabel('网站标题',{exact:true});await title.fill('保留中的网站草稿')
+ await tabs.getByRole('tab',{name:'安全与备份',exact:true}).click();await expect(page.getByRole('heading',{name:'管理员密码',exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'下载备份',exact:true})).toBeDisabled();await expect(page.getByRole('button',{name:'恢复备份',exact:true})).toBeDisabled();await page.getByLabel('备份密码',{exact:true}).fill('PrismFlow-test-backup-key');const picker=page.waitForEvent('filechooser');await page.getByRole('button',{name:'恢复备份',exact:true}).focus();await page.keyboard.press('Enter');expect((await picker).isMultiple()).toBe(false);await page.getByLabel('备份密码',{exact:true}).fill('');await page.screenshot({path:resolve('../docs/screenshots/settings-security.png'),fullPage:true,animations:'disabled'})
+ await tabs.getByRole('tab',{name:'伪装网站',exact:true}).click();await expect(title).toHaveValue('保留中的网站草稿')
+ await service.click();await page.getByRole('button',{name:'外观设置',exact:true}).click();await page.getByLabel('启用玻璃透明效果',{exact:true}).uncheck();await page.getByRole('button',{name:'关闭外观设置',exact:true}).click();await page.reload();await expect(page.locator('html')).toHaveAttribute('data-glass','off')
+ await page.getByRole('button',{name:'外观设置',exact:true}).click();await page.getByLabel('启用玻璃透明效果',{exact:true}).check();await page.getByRole('button',{name:'关闭外观设置',exact:true}).click()
+ await page.getByRole('button',{name:'系统设置',exact:true}).click();await page.getByRole('button',{name:'切换浅色主题',exact:true}).click();await page.screenshot({path:resolve('../docs/screenshots/settings-light.png'),fullPage:true,animations:'disabled'});await page.getByRole('button',{name:'切换深色主题',exact:true}).click()
+ await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
+ await page.getByRole('tab',{name:'安全与备份',exact:true}).click();await expect(page.getByRole('heading',{name:'加密备份与恢复',exact:true})).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
+})

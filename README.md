@@ -31,7 +31,7 @@ PrismFlow 面向个人与小团队的单台 VPS，使用 **Go + SQLite**，将 R
 | --- | --- |
 | ![快速创建协议](docs/screenshots/protocols.png) | ![用户订阅弹窗](docs/screenshots/subscription.png) |
 
-[普通创建与字段帮助](docs/screenshots/field-help.png) · [系统设置](docs/screenshots/settings.png) · [浅色主题](docs/screenshots/light.png) · [手机总览](docs/screenshots/mobile.png)
+[普通创建与字段帮助](docs/screenshots/field-help.png) · [系统设置](docs/screenshots/settings.png) · [流量与记录](docs/screenshots/settings-traffic.png) · [浅色主题](docs/screenshots/light.png) · [手机总览](docs/screenshots/mobile.png)
 
 </details>
 

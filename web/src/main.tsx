@@ -5,5 +5,6 @@ import App from './App'
 import './style.css'
 import './responsive.css'
 import './compact.css'
+import './settings.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><App /></React.StrictMode>)

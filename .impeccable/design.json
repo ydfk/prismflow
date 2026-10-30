@@ -180,7 +180,7 @@
       "css": ".ds-nav{caret-color:transparent;border:1px solid var(--line,#ffffff14);border-radius:12px;padding:16px;background:color-mix(in srgb,var(--surface,#252522) var(--glass-opacity,72%),transparent);backdrop-filter:blur(var(--glass-blur,20px)) saturate(var(--glass-saturation,125%));box-shadow:var(--shadow,0 12px 35px -25px #000);color:var(--text,#f4f2ef); display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-height:52px}.ds-nav-item{user-select:none;display:flex;align-items:center;gap:8px;background:transparent;border:0;border-radius:22px;padding:9px 13px;font:12px 'Manrope Variable','Microsoft YaHei','PingFang SC',sans-serif;color:var(--muted,#b5afa7);cursor:pointer}.ds-nav-item:hover{background:var(--input,#ffffff08);color:var(--text,#f4f2ef)}.ds-nav-item.ds-nav-active{background:var(--primary,#e5ab7d);color:var(--bg,#0b0b0b);font-weight:750}.ds-nav-item:focus-visible{outline:2px solid var(--primary,#e5ab7d);outline-offset:4px;}",
       "kind": "nav",
       "refersTo": "navigation-active",
-      "description": "总览、协议入口、用户与订阅、域名与证书、系统设置构成主导航；伪装网站移入系统设置。选中主色胶囊，手机左抽屉。"
+      "description": "总览、协议入口、用户与订阅、域名与证书、系统设置构成平级主导航，不显示下拉箭头；伪装网站在系统设置分类内。选中主色胶囊，手机左抽屉。"
     },
     {
       "html": "<section class=\"ds-surface\"><div class=\"ds-quota-heading\"><h2 class=\"ds-surface-title\">服务器流量</h2><span>全用户共享周期用量</span></div><div class=\"ds-quota\"><strong>0 B <small>/ 不限额</small></strong><span>服务器网卡监控需要 Linux /proc</span><progress aria-label=\"服务器周期用量\" max=\"1\" value=\"0\"></progress></div></section>",
@@ -237,7 +237,7 @@
     "keyCharacteristics": [
       "暖黑与香槟橙形成主层级，浅色主题使用暖白与深棕。",
       "桌面横向导航和四列资源卡，移动端抽屉与两列资源卡。",
-      "模糊、不透明度和饱和度可实时调整，偏好保存在当前浏览器。",
+      "外观浮层集中提供玻璃开关及模糊、不透明度、饱和度调节，偏好保存在当前浏览器。",
       "保存后自动校验并应用，数据与空状态均来自真实服务状态。",
       "紧凑列表承载日常管理，新增弹窗承载输入、检测与就地错误反馈。"
     ],

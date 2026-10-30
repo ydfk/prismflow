@@ -1,19 +1,62 @@
-import { useEffect, useState } from 'react'
-import { Download, Upload } from 'lucide-react'
-import { api, request } from '../api'
+import { useEffect, useId, useState, type KeyboardEvent } from 'react'
+import { Activity, DatabaseBackup, Globe, Server } from 'lucide-react'
+import { api } from '../api'
 import KernelPanel from './KernelPanel'
 import UpdatePanel from './UpdatePanel'
 import Website from './Website'
 import TrafficSettings from './TrafficSettings'
+import SettingsBackup from './SettingsBackup'
 import type { PageProps } from '../types'
-import { AsyncForm, Button, Field, Notice } from '../ui'
+import { AsyncForm, Field, Notice } from '../ui'
 
-export default function Settings({ snapshot, refresh, notify }: PageProps) {
-  const [retention, setRetention] = useState(snapshot.state.retentionDays); const [error, setError] = useState(''); const [events, setEvents] = useState<{ time: string; message: string }[]>([]); const [passphrase, setPassphrase] = useState(''); const [backupBusy, setBackupBusy] = useState(false); const [current, setCurrent] = useState(''); const [password, setPassword] = useState(''); const [glass, setGlass] = useState(localStorage.getItem('prismflow.glass') !== 'off')
-  useEffect(() => { api<typeof events>('/events').then(setEvents).catch(e => setError(e.message)) }, [snapshot.appliedRevision, snapshot.core.running])
-  async function backup() { setBackupBusy(true); setError(''); try { const response = await request('/backup', 'POST', { passphrase }); const blob = await response.blob(); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'prismflow.pfb'; link.click(); setTimeout(() => URL.revokeObjectURL(link.href), 1000); notify('加密备份已下载') } catch (e) { setError((e as Error).message) } finally { setBackupBusy(false) } }
-  async function restore(file?: File) { if (!file || !confirm('恢复将替换入口、用户、证书和网站配置。请先停止内核并备份当前配置。继续？')) return; setBackupBusy(true); setError(''); try { if (file.size > 35 * 1024 * 1024) throw new Error('备份文件超过大小限制'); const bytes = new Uint8Array(await file.arrayBuffer()); let text = ''; for (let i = 0; i < bytes.length; i += 8192) text += String.fromCharCode(...bytes.subarray(i, i + 8192)); await api('/restore', 'POST', { passphrase, archive: btoa(text) }); await refresh(); notify('配置已恢复，可在内核卡片启动服务') } catch (e) { setError((e as Error).message) } finally { setBackupBusy(false) } }
-  return <>{error && <Notice error>{error}</Notice>}<div className="settings-grid"><section className="surface"><div className="section-heading"><h2>订阅与数据</h2></div><AsyncForm submit={async () => { await api('/settings', 'PUT', { retentionDays: retention }); await refresh(); notify('系统设置已保存') }}><Field label="流量历史保留天数"><input type="number" min={1} max={365} value={retention} onChange={e => setRetention(Number(e.target.value))}/></Field></AsyncForm><div className="checks"><label><input type="checkbox" checked={glass} onChange={e => { setGlass(e.target.checked); const v = e.target.checked ? 'on' : 'off'; localStorage.setItem('prismflow.glass', v); document.documentElement.dataset.glass = v }}/>启用玻璃透明效果</label></div></section><KernelPanel snapshot={snapshot} refresh={refresh} notify={notify}/></div>
-    <UpdatePanel notify={notify}/><TrafficSettings snapshot={snapshot} refresh={refresh} notify={notify}/><Website snapshot={snapshot} refresh={refresh} notify={notify}/><section className="surface"><div className="section-heading"><h2>加密备份与恢复</h2><span className="subtle">AES-256-GCM</span></div><p className="section-description">备份包含协议凭据、用户、当前证书、内置 ACME 账户和自定义网站。acme.sh 账户请另行备份服务数据目录；系统证书文件请使用原工具备份。管理员密码、历史流量和日志不包含在内。</p><div className="backup-controls"><Field label="备份密码" hint="至少 12 字节；恢复时使用创建备份时的密码。"><input type="password" minLength={12} autoComplete="new-password" value={passphrase} onChange={e => setPassphrase(e.target.value)}/></Field><Button busy={backupBusy} disabled={passphrase.length < 12} onClick={backup}><Download size={16}/>下载备份</Button><label className={`button upload-button ${backupBusy || passphrase.length < 12 ? 'disabled' : ''}`}><Upload size={16}/>恢复备份<input type="file" accept=".pfb" disabled={backupBusy || passphrase.length < 12} onChange={e => { restore(e.target.files?.[0]); e.target.value = '' }}/></label></div></section>
-    <div className="settings-grid"><section className="surface"><div className="section-heading"><h2>管理员密码</h2></div><AsyncForm label="更新密码并退出" submit={async () => { await api('/password', 'POST', { current, password }); window.dispatchEvent(new Event('session-expired')) }}><Field label="当前密码"><input type="password" required autoComplete="current-password" value={current} onChange={e => setCurrent(e.target.value)}/></Field><Field label="新密码"><input type="password" required minLength={12} maxLength={72} autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)}/></Field></AsyncForm></section><section className="surface"><div className="section-heading"><h2>运行事件</h2><span className="subtle">最近 100 条</span></div><div className="event-list">{events.length ? events.map((e, i) => <div key={`${e.time}-${i}`}><span>{e.message}</span><time>{e.time} UTC</time></div>) : <p>暂无事件记录</p>}</div></section></div></>
+const sections=[
+ {id:'service',label:'服务管理',icon:Server},
+ {id:'traffic',label:'流量与记录',icon:Activity},
+ {id:'website',label:'伪装网站',icon:Globe},
+ {id:'security',label:'安全与备份',icon:DatabaseBackup},
+] as const
+type Section=typeof sections[number]['id']
+
+export default function Settings({snapshot,refresh,notify}:PageProps){
+ const prefix=useId()
+ const [section,setSection]=useState<Section>('service')
+ const [retention,setRetention]=useState(snapshot.state.retentionDays)
+ const [events,setEvents]=useState<{time:string;message:string}[]>([])
+ const [error,setError]=useState('')
+ const [current,setCurrent]=useState('')
+ const [password,setPassword]=useState('')
+ useEffect(()=>{
+  let active=true
+  api<typeof events>('/events').then(value=>{if(active)setEvents(value)}).catch(e=>{if(active)setError(e.message)})
+  return()=>{active=false}
+ },[snapshot.appliedRevision,snapshot.core.running])
+ function navigateTabs(event:KeyboardEvent<HTMLButtonElement>,index:number){
+  let next=index
+  if(event.key==='ArrowRight')next=(index+1)%sections.length
+  else if(event.key==='ArrowLeft')next=(index+sections.length-1)%sections.length
+  else if(event.key==='Home')next=0
+  else if(event.key==='End')next=sections.length-1
+  else return
+  event.preventDefault();setSection(sections[next].id)
+  document.getElementById(`${prefix}-tab-${sections[next].id}`)?.focus()
+ }
+ return <div className="settings-workspace">
+  <div className="settings-tabs" role="tablist" aria-label="系统设置分类">{sections.map((item,index)=><button key={item.id} id={`${prefix}-tab-${item.id}`} type="button" role="tab" aria-controls={`${prefix}-panel-${item.id}`} aria-selected={section===item.id} tabIndex={section===item.id?0:-1} onClick={()=>setSection(item.id)} onKeyDown={event=>navigateTabs(event,index)}><item.icon size={15}/>{item.label}</button>)}</div>
+  {error&&<Notice error>{error}</Notice>}
+  <div className="settings-panel settings-service" id={`${prefix}-panel-service`} role="tabpanel" aria-labelledby={`${prefix}-tab-service`} hidden={section!=='service'}>
+   <KernelPanel snapshot={snapshot} refresh={refresh} notify={notify}/>
+   <UpdatePanel notify={notify}/>
+  </div>
+  <div className="settings-panel settings-traffic" id={`${prefix}-panel-traffic`} role="tabpanel" aria-labelledby={`${prefix}-tab-traffic`} hidden={section!=='traffic'}>
+   <TrafficSettings snapshot={snapshot} refresh={refresh} notify={notify}/>
+   <div className="settings-column"><section className="surface"><div className="section-heading"><h2>历史记录</h2></div><AsyncForm label="保存历史设置" submit={async()=>{await api('/settings','PUT',{retentionDays:retention});await refresh();notify('历史记录设置已保存')}}><Field label="流量历史保留天数"><input type="number" min={1} max={365} value={retention} onChange={e=>setRetention(Number(e.target.value))}/></Field></AsyncForm></section>
+    <section className="surface"><div className="section-heading"><h2>运行事件</h2><span className="subtle">最近 100 条</span></div><div className="event-list">{events.length?events.map((event,index)=><div key={`${event.time}-${index}`}><span>{event.message}</span><time>{event.time} UTC</time></div>):<p>暂无事件记录</p>}</div></section>
+   </div>
+  </div>
+  <div className="settings-panel" id={`${prefix}-panel-website`} role="tabpanel" aria-labelledby={`${prefix}-tab-website`} hidden={section!=='website'}><Website snapshot={snapshot} refresh={refresh} notify={notify}/></div>
+  <div className="settings-panel settings-security" id={`${prefix}-panel-security`} role="tabpanel" aria-labelledby={`${prefix}-tab-security`} hidden={section!=='security'}>
+   <section className="surface"><div className="section-heading"><h2>管理员密码</h2></div><AsyncForm label="更新密码并退出" submit={async()=>{await api('/password','POST',{current,password});window.dispatchEvent(new Event('session-expired'))}}><Field label="当前密码"><input type="password" required autoComplete="current-password" value={current} onChange={e=>setCurrent(e.target.value)}/></Field><Field label="新密码"><input type="password" required minLength={12} maxLength={72} autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)}/></Field></AsyncForm></section>
+   <SettingsBackup refresh={refresh} notify={notify}/>
+  </div>
+ </div>
 }
