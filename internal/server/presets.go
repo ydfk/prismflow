@@ -85,6 +85,9 @@ func (s *Server) createPreset(w http.ResponseWriter, r *http.Request) {
 				e.TLSMode = in.TLSMode
 				e.PublicPort = in.PublicPort
 				if e.ExternalTLS() {
+					if e.PublicPort == 0 {
+						e.PublicPort = model.WebTLSPort(st.PublicURL)
+					}
 					e.CertificateID = ""
 				}
 			}

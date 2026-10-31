@@ -77,6 +77,9 @@ func newEndpointDefaults(e *model.Endpoint, st model.State, reserved []int) erro
 		e.PublicPort = 0
 	}
 	if e.ExternalTLS() {
+		if e.PublicPort == 0 {
+			e.PublicPort = model.WebTLSPort(st.PublicURL)
+		}
 		e.CertificateID = ""
 		e.ServerName = e.Host
 	}

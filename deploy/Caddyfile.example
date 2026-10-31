@@ -1,25 +1,23 @@
-# 合并到已有 Caddyfile；面板内可根据已保存地址与 XHTTP 路径生成完整片段。
-panel.example.com {
-    reverse_proxy 127.0.0.1:8080
-}
-sub.example.com {
-    reverse_proxy 127.0.0.1:8081
-}
-# 可选：外部 TLS 的 VLESS XHTTP。替换路径与本机端口，保留请求路径。
-node.example.com {
-    @xhttp path /replace-with-entry-path /replace-with-entry-path/*
-    handle @xhttp {
-        reverse_proxy 127.0.0.1:23456 {
-            flush_interval -1
-        }
-    }
+# 将 example.com 替换为统一域名，合并到现有 Caddyfile。
+# Caddy 与 PrismFlow 必须能访问同一个宿主机回环地址；容器 Caddy 可使用 host 网络。
+example.com {
+    # 可选：仅在启用反代 TLS 的 XHTTP 后，添加面板生成的对应 handle 规则。
+    # @xhttp path /replace-with-entry-path /replace-with-entry-path/*
+    # handle @xhttp {
+    #     reverse_proxy 127.0.0.1:23456 {
+    #         flush_interval -1
+    #     }
+    # }
     handle {
-        respond 404
+        reverse_proxy 127.0.0.1:8081
     }
 }
-# REALITY / AnyTLS / Hysteria2 仍直连 Mihomo 的随机 TCP/UDP 端口。
-# 仅在由面板签发 HTTP-01 证书时，将该规则合并到对应域名现有 HTTP 站点。
-# http://node.example.com {
+# /              伪装网站
+# /manage/       管理面板（可在面板修改管理路径）
+# /s/令牌        用户订阅
+# REALITY / AnyTLS / Hysteria2 仍直连各自的 TCP/UDP 端口。
+# 若通过面板申请 HTTP-01 证书，将验证路径合并到对应 HTTP 站点。
+# http://example.com {
 #     handle /.well-known/acme-challenge/* {
 #         reverse_proxy 127.0.0.1:8081
 #     }

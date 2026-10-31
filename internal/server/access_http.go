@@ -79,7 +79,11 @@ func (s *Server) checkAccess(w http.ResponseWriter, r *http.Request) {
 	state := s.State()
 	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
 	defer cancel()
-	results := []accessCheck{checkAccessURL(ctx, "panel", state.Access.PanelURL), checkAccessURL(ctx, "public", state.PublicURL)}
+	panel := state.Access.PanelURL
+	if panel != "" && normalizedOrigin(panel) == normalizedOrigin(state.PublicURL) {
+		panel += state.Access.ManagementPath()
+	}
+	results := []accessCheck{checkAccessURL(ctx, "panel", panel), checkAccessURL(ctx, "public", state.PublicURL)}
 	respond(w, 200, results)
 }
 func (s *Server) accessConfig(w http.ResponseWriter, r *http.Request) {

@@ -289,6 +289,9 @@ func (s *Server) settings(w http.ResponseWriter, r *http.Request) {
 					st.Endpoints[i].Host = st.DefaultHost
 					if st.Endpoints[i].ExternalTLS() {
 						st.Endpoints[i].ServerName = st.DefaultHost
+						if body.PublicURL != nil && st.PublicURL != "" {
+							st.Endpoints[i].PublicPort = model.WebTLSPort(st.PublicURL)
+						}
 					}
 					if st.Endpoints[i].Security == "tls" && !st.Endpoints[i].ExternalTLS() && st.DefaultCertificateID != "" {
 						st.Endpoints[i].CertificateID = st.DefaultCertificateID
@@ -297,6 +300,9 @@ func (s *Server) settings(w http.ResponseWriter, r *http.Request) {
 								st.Endpoints[i].ServerName = cert.Domain
 								if strings.HasPrefix(cert.Domain, "*.") {
 									st.Endpoints[i].ServerName = st.DefaultHost
+									if body.PublicURL != nil && st.PublicURL != "" {
+										st.Endpoints[i].PublicPort = model.WebTLSPort(st.PublicURL)
+									}
 								}
 							}
 						}

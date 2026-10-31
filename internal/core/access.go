@@ -35,8 +35,13 @@ func ValidateAccess(s model.State) error {
 	if a.PanelURL != "" && !ValidPublicURL(a.PanelURL) {
 		return errors.New("面板地址须为 HTTPS 根地址；仅本机可用 HTTP")
 	}
-	if a.PanelURL != "" && s.PublicURL != "" && publicAuthority(a.PanelURL) == publicAuthority(s.PublicURL) {
-		return errors.New("面板和订阅请使用不同的域名或端口")
+	if !proxyPath.MatchString(a.ManagementPath()) {
+		return errors.New("管理路径必须以 / 开头，仅含字母、数字、下划线或连字符")
+	}
+	for _, reserved := range []string{"/api", "/s", "/.well-known", "/assets"} {
+		if a.ManagementPath() == reserved || strings.HasPrefix(a.ManagementPath(), reserved+"/") {
+			return errors.New("管理路径与系统保留路径冲突")
+		}
 	}
 	if a.XHTTPTLS != "" && a.XHTTPTLS != "external" && a.XHTTPTLS != "core" {
 		return errors.New("XHTTP TLS 默认方式无效")
@@ -66,6 +71,11 @@ func ValidateAccess(s model.State) error {
 		}
 		if e.ServerName != "" && !strings.EqualFold(e.ServerName, e.Host) {
 			return errors.New("外部 TLS 的 SNI 必须与公网节点域名一致，以匹配反代路由")
+		}
+		for _, reserved := range []string{a.ManagementPath(), "/s", "/.well-known"} {
+			if e.Path == reserved || strings.HasPrefix(e.Path, reserved+"/") || strings.HasPrefix(reserved, e.Path+"/") {
+				return errors.New("XHTTP 路径与管理或订阅路径冲突")
+			}
 		}
 		if !e.Enabled {
 			continue
@@ -103,18 +113,4 @@ func CertificateNames(cert *x509.Certificate) []string {
 		names = append(names, ip.String())
 	}
 	return names
-}
-func publicAuthority(address string) string {
-	u, err := url.Parse(address)
-	if err != nil {
-		return address
-	}
-	port := u.Port()
-	if port == "" {
-		port = "443"
-		if u.Scheme == "http" {
-			port = "80"
-		}
-	}
-	return net.JoinHostPort(strings.ToLower(u.Hostname()), port)
 }

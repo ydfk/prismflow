@@ -1,13 +1,14 @@
 import { Children, cloneElement, isValidElement, useId, useState, type ReactElement, type ReactNode, type FormEvent } from 'react'
-import { LoaderCircle, Check, AlertCircle, Plus, CircleHelp } from 'lucide-react'
+import { LoaderCircle, Check, AlertCircle, Plus } from 'lucide-react'
 import Modal from './Modal'
+import FieldHelp from './FieldHelp'
 import { fieldGuidance } from './fieldGuidance'
 
 export function Button({ children, className = '', busy, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { busy?: boolean }) {
   return <button {...props} className={`button ${className}`} disabled={props.disabled || busy}>{busy && <LoaderCircle size={16} className="spin" />}{children}</button>
 }
 export function Field({ label, hint, help, children }: { label: string; hint?: string; help?: string; children: ReactNode }) {
-  const id = useId();const [helpOpen,setHelpOpen]=useState(false)
+  const id = useId()
  const guidance=fieldGuidance[label];const explanation=help||guidance?.help||hint
   const associate = (nodes: ReactNode): ReactNode => Children.map(nodes, node => {
     if (!isValidElement(node)) return node
@@ -16,7 +17,7 @@ export function Field({ label, hint, help, children }: { label: string; hint?: s
     if (element.type === 'div') return cloneElement(element, {}, associate(element.props.children as ReactNode))
     return element
   })
-  return <div className="field" onKeyDown={e=>{if(e.key==='Escape'&&helpOpen){e.preventDefault();e.stopPropagation();setHelpOpen(false)}}}><div className="field-label"><label htmlFor={id}>{label}</label>{explanation&&<button type="button" className="field-help-toggle" aria-label={`解释 ${label}`} aria-expanded={helpOpen} aria-controls={`${id}-help`} onClick={()=>setHelpOpen(!helpOpen)}><CircleHelp size={14}/></button>}</div>{explanation&&helpOpen&&<div id={`${id}-help`} className="field-help-note" role="note">{explanation}</div>}{associate(children)}</div>
+  return <div className="field"><div className="field-label"><label htmlFor={id}>{label}</label>{explanation&&<FieldHelp label={label} text={explanation} id={`${id}-help`}/>}</div>{associate(children)}</div>
 }
 export function Notice({ children, error = false }: { children: ReactNode; error?: boolean }) { return <div role={error ? 'alert' : 'status'} className={`notice ${error ? 'error' : ''}`}><AlertCircle size={17} /><span>{children}</span></div> }
 export function Empty({ title, description, action }: { title: string; description: string; action?: ReactNode }) { return <div className="empty"><div className="empty-symbol"><Plus size={24} /></div><h3>{title}</h3><p>{description}</p>{action}</div> }

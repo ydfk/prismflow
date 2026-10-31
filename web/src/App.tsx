@@ -4,6 +4,7 @@ import { api } from './api'
 import type { Page, Snapshot } from './types'
 import { Notice } from './ui'
 import Login from './Login'
+import useActionHints from './useActionHints'
 import Overview from './pages/Overview'
 import Appearance, { restoreMaterial } from './Appearance'
 const Endpoints = lazy(() => import('./pages/Endpoints'))
@@ -19,6 +20,7 @@ const navigation = [
  { id:'settings',name:'系统设置',icon:Settings2,description:'管理内核、订阅和服务状态。' },
 ] as const
 export default function App() {
+ useActionHints()
  const [snapshot,setSnapshot]=useState<Snapshot>(); const [auth,setAuth]=useState<'loading'|'login'|'ready'>('loading'); const [setup,setSetup]=useState(false)
  const [page,setPage]=useState<Page>('overview'); const [error,setError]=useState('');const [toast,setToast]=useState(''); const [menu,setMenu]=useState(false);const [appearance,setAppearance]=useState(false)
  const [dark,setDark]=useState(()=>localStorage.getItem('prismflow.theme.v2')!=='light')
@@ -36,12 +38,12 @@ export default function App() {
   document.addEventListener('keydown',keydown);return()=>{document.removeEventListener('keydown',keydown);previous?.focus()}
  },[mobile,menu])
  const navigate=(target:Page)=>{setPage(target);setMenu(false);window.scrollTo({top:0})}
- if(auth==='loading')return <div className="loading-page"><img src="/logo.svg?v=2" alt="PrismFlow"/><p>正在连接工作台…</p>{error&&<Notice error>{error}</Notice>}</div>
+ if(auth==='loading')return <div className="loading-page"><img src="./logo.svg?v=2" alt="PrismFlow"/><p>正在连接工作台…</p>{error&&<Notice error>{error}</Notice>}</div>
  if(auth==='login')return <Login setup={setup} onLogin={()=>{setSetup(false);refresh().catch(e=>setError(e.message))}}/>
  if(!snapshot)return null
  const current=navigation.find(item=>item.id===page)!;const props={snapshot,refresh,notify:setToast}
  return <div className="app-shell"><a className="skip-link" href="#main">跳至主要内容</a>
-  <header className="masthead"><a className="brand" href="/"><span className="brand-mark"><img src="/logo.svg?v=2" alt=""/></span><span>PrismFlow<small>棱流</small></span></a><div className="masthead-actions"><span className="server-pill"><Radio size={14}/><span className={`status-light ${snapshot.core.running?'online':''}`}/>{snapshot.core.running?'服务运行中':'等待启动'}</span><button className="icon-button" aria-label="外观设置" aria-expanded={appearance} onClick={()=>setAppearance(!appearance)}><Palette size={18}/></button><button className="icon-button" aria-label={dark?'切换浅色主题':'切换深色主题'} onClick={()=>setDark(!dark)}>{dark?<Sun size={18}/>:<Moon size={18}/>}</button><button className="icon-button" aria-label="退出登录" onClick={async()=>{try{await api('/session','DELETE');setAuth('login')}catch(e){setError((e as Error).message)}}}><LogOut size={17}/></button></div></header>
+  <header className="masthead"><a className="brand" href="./"><span className="brand-mark"><img src="./logo.svg?v=2" alt=""/></span><span>PrismFlow<small>棱流</small></span></a><div className="masthead-actions"><span className="server-pill"><Radio size={14}/><span className={`status-light ${snapshot.core.running?'online':''}`}/>{snapshot.core.running?'服务运行中':'等待启动'}</span><button className="icon-button" aria-label="外观设置" aria-expanded={appearance} onClick={()=>setAppearance(!appearance)}><Palette size={18}/></button><button className="icon-button" aria-label={dark?'切换浅色主题':'切换深色主题'} onClick={()=>setDark(!dark)}>{dark?<Sun size={18}/>:<Moon size={18}/>}</button><button className="icon-button" aria-label="退出登录" onClick={async()=>{try{await api('/session','DELETE');setAuth('login')}catch(e){setError((e as Error).message)}}}><LogOut size={17}/></button></div></header>
   <div className="navigation-bar surface"><button className="icon-button mobile-menu" aria-label="打开导航" aria-expanded={menu} aria-controls="navigation-drawer" onClick={()=>setMenu(true)}><Menu size={20}/></button>
    <nav id="navigation-drawer" ref={sidebar} className={`sidebar ${menu?'open':''}`} inert={mobile&&!menu} aria-label="主要导航" role={mobile?'dialog':undefined} aria-modal={mobile&&menu?true:undefined}><button className="icon-button mobile-close" aria-label="关闭导航" onClick={()=>setMenu(false)}><X size={20}/></button>{navigation.map(item=><button key={item.id} className={`nav-item ${page===item.id?'active':''}`} aria-current={page===item.id?'page':undefined} onClick={()=>navigate(item.id)}><item.icon size={16}/><span>{item.name}</span></button>)}</nav><span className="mobile-current">{current.name}</span></div>
   {menu&&mobile&&<button className="mobile-scrim" tabIndex={-1} aria-label="收起导航" onClick={()=>setMenu(false)}/>}

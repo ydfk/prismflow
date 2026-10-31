@@ -12,11 +12,14 @@ import (
 )
 
 type Job struct {
-	ID        string    `json:"id"`
-	Domain    string    `json:"domain"`
-	Status    string    `json:"status"`
-	Message   string    `json:"message"`
-	CreatedAt time.Time `json:"createdAt"`
+	CertificateID string    `json:"certificateId,omitempty"`
+	Operation     string    `json:"operation,omitempty"`
+	UpdatedAt     time.Time `json:"updatedAt,omitempty"`
+	ID            string    `json:"id"`
+	Domain        string    `json:"domain"`
+	Status        string    `json:"status"`
+	Message       string    `json:"message"`
+	CreatedAt     time.Time `json:"createdAt"`
 }
 
 func (s *Server) importCertificate(w http.ResponseWriter, r *http.Request) {
@@ -38,10 +41,13 @@ func (s *Server) importCertificate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c := model.Certificate{ID: model.ID(), Domain: body.Domain, PEM: body.PEM, Key: body.Key, ExpiresAt: cert.NotAfter, Method: "import"}
-	mutationResult(w, s.mutate(func(st *model.State) error {
+	err = s.mutate(func(st *model.State) error {
 		if body.ID != "" {
 			for i := range st.Certificates {
 				if st.Certificates[i].ID == body.ID {
+					if st.Certificates[i].Method != "import" {
+						return errors.New("自动或系统证书不能通过上传替换，请使用续期或重新读取")
+					}
 					c.ID = body.ID
 					st.Certificates[i] = c
 					return nil
@@ -54,7 +60,13 @@ func (s *Server) importCertificate(w http.ResponseWriter, r *http.Request) {
 		}
 		st.Certificates = append(st.Certificates, c)
 		return nil
-	}))
+	})
+	logID := c.ID
+	if body.ID != "" {
+		logID = body.ID
+	}
+	s.recordCertificateResult(logID, c.Domain, "导入证书", err)
+	mutationResult(w, err)
 }
 func (s *Server) issueCertificate(w http.ResponseWriter, r *http.Request) {
 	var body struct {
@@ -91,15 +103,26 @@ func (s *Server) issueCertificate(w http.ResponseWriter, r *http.Request) {
 	respond(w, 202, job)
 }
 func (s *Server) renewCertificate(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Production bool `json:"production"`
+	}
+	if r.ContentLength > 0 && !decode(w, r, &body) {
+		return
+	}
 	for _, c := range s.State().Certificates {
 		if c.ID == r.PathValue("id") {
 			if c.Method == "path" {
-				mutationResult(w, s.mutate(func(st *model.State) error { return nil }))
+				err := s.mutate(func(st *model.State) error { return nil })
+				s.recordCertificateResult(c.ID, c.Domain, "重新读取系统证书", err)
+				mutationResult(w, err)
 				return
 			}
 			if c.Method == "import" {
 				fail(w, 400, errors.New("导入证书需要重新导入"))
 				return
+			}
+			if body.Production {
+				c.Staging = false
 			}
 			job, err := s.startIssue(c)
 			if err != nil {
@@ -113,6 +136,13 @@ func (s *Server) renewCertificate(w http.ResponseWriter, r *http.Request) {
 	http.NotFound(w, r)
 }
 func (s *Server) startIssue(c model.Certificate) (Job, error) {
+	operation := "申请证书"
+	for _, existing := range s.State().Certificates {
+		if existing.ID == c.ID {
+			operation = "续期证书"
+			break
+		}
+	}
 	s.jobsMu.Lock()
 	for _, j := range s.jobs {
 		if j.Status == "running" {
@@ -120,17 +150,15 @@ func (s *Server) startIssue(c model.Certificate) (Job, error) {
 			return Job{}, errors.New("已有证书任务正在进行")
 		}
 	}
-	if len(s.jobs) > 50 {
-		for k, j := range s.jobs {
-			if j.Status != "running" {
-				delete(s.jobs, k)
-			}
-		}
-	}
-	job := Job{model.ID(), c.Domain, "running", "正在验证域名并申请证书", time.Now().UTC()}
+	job := Job{ID: model.ID(), CertificateID: c.ID, Operation: operation, Domain: c.Domain, Status: "running", Message: "正在验证域名并申请证书", CreatedAt: time.Now().UTC()}
 	s.jobs[job.ID] = job
+	if err := s.saveCertificateJobsLocked(); err != nil {
+		delete(s.jobs, job.ID)
+		s.jobsMu.Unlock()
+		return Job{}, err
+	}
 	s.jobsMu.Unlock()
-	go func() {
+	go func(job Job) {
 		issued, err := s.Certificates.Issue(c)
 		if err == nil {
 			err = s.mutate(func(st *model.State) error {
@@ -158,15 +186,24 @@ func (s *Server) startIssue(c model.Certificate) (Job, error) {
 				return nil
 			})
 		}
+		job.UpdatedAt = time.Now().UTC()
 		s.jobsMu.Lock()
 		s.jobs[job.ID] = job
+		s.persistCertificateJobsLocked()
 		s.jobsMu.Unlock()
 		s.Store.Event("证书任务：" + job.Status)
-	}()
+	}(job)
 	return job, nil
 }
 func (s *Server) deleteCertificate(w http.ResponseWriter, r *http.Request) {
-	mutationResult(w, s.mutate(func(st *model.State) error {
+	var certificate model.Certificate
+	for _, c := range s.State().Certificates {
+		if c.ID == r.PathValue("id") {
+			certificate = c
+			break
+		}
+	}
+	err := s.mutate(func(st *model.State) error {
 		for _, e := range st.Endpoints {
 			if e.Security == "tls" && !e.Native && !e.ExternalTLS() && e.CertificateID == r.PathValue("id") {
 				return errors.New("证书仍被入口引用")
@@ -181,7 +218,11 @@ func (s *Server) deleteCertificate(w http.ResponseWriter, r *http.Request) {
 			return errors.New("证书不存在")
 		}
 		return nil
-	}))
+	})
+	if certificate.ID != "" {
+		s.recordCertificateResult(certificate.ID, certificate.Domain, "删除证书关联", err)
+	}
+	mutationResult(w, err)
 }
 func (s *Server) getJobs(w http.ResponseWriter, r *http.Request) {
 	s.jobsMu.Lock()

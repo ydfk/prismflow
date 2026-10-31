@@ -17,6 +17,7 @@ import (
 	"prismflow/internal/website"
 	"prismflow/internal/webui"
 	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -73,6 +74,17 @@ func New(ctx context.Context, o Options) (*Server, error) {
 		}
 	}
 	s := &Server{Options: o, Store: db, state: state, applied: model.Default(), sessions: map[string]session{}, attempts: map[string]attempt{}, jobs: map[string]Job{}, ctx: ctx}
+	if err = db.Get("certificate-jobs", &s.jobs); err != nil && !isMissing(err) {
+		db.DB.Close()
+		return nil, err
+	}
+	for id, job := range s.jobs {
+		if job.Status == "running" {
+			job.Status = "failed"
+			job.Message = "服务已重启，上次任务中断，可重新申请或续期"
+			s.jobs[id] = job
+		}
+	}
 	if err = db.Get("applied", &s.applied); err != nil && !isMissing(err) {
 		return nil, err
 	}
@@ -230,10 +242,24 @@ func (s *Server) AdminHandler() http.Handler {
 }
 func (s *Server) PublicHandler() http.Handler {
 	mux := http.NewServeMux()
+	admin := s.AdminHandler()
 	mux.HandleFunc("GET /.well-known/acme-challenge/{token}", s.Certificates.Challenge)
 	mux.HandleFunc("GET /.well-known/prismflow-access", accessMarker("public"))
 	mux.HandleFunc("GET /s/{token}", s.subscription)
-	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		prefix := s.State().Access.ManagementPath()
+		if r.URL.Path == prefix {
+			http.Redirect(w, r, prefix+"/", http.StatusTemporaryRedirect)
+			return
+		}
+		if strings.HasPrefix(r.URL.Path, prefix+"/") {
+			http.StripPrefix(prefix, admin).ServeHTTP(w, r)
+			return
+		}
+		if r.Method != "GET" && r.Method != "HEAD" {
+			http.NotFound(w, r)
+			return
+		}
 		website.Serve(w, r, s.State().Website, filepath.Join(s.Options.DataDir, "sites"))
 	})
 	return mux

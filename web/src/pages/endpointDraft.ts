@@ -6,9 +6,13 @@ export const quickChoices = [
  {id:'anytls',name:'AnyTLS',protocol:'anytls',transport:'tcp',security:'tls'},
  {id:'hysteria2',name:'Hysteria2',protocol:'hysteria2',transport:'quic',security:'tls'},
 ]
+export function publicTLSPort(address:string):number {
+ if(!address)return 443
+ try{const url=new URL(address);return url.protocol==='https:'?Number(url.port)||443:443}catch{return 443}
+}
 export function newDraft(snapshot:Snapshot):EndpointDraft {
  const certificateId=snapshot.state.defaultCertificateId||snapshot.state.certificates[0]?.id||''
- return {id:'',name:'',protocol:'vless',transport:'tcp',security:'reality',host:snapshot.state.defaultHost||'',port:0,enabled:true,path:'/prismflow',certificateId,serverName:'www.microsoft.com',realityTarget:'www.microsoft.com:443',privateKey:'',publicKey:'',shortId:'',password:'',masquerade:false,native:false,nativeConfig:'',tlsMode:snapshot.state.access?.xhttpTls||'core',publicPort:0,userIds:[]}
+ return {id:'',name:'',protocol:'vless',transport:'tcp',security:'reality',host:snapshot.state.defaultHost||window.location.hostname,port:0,enabled:true,path:'/prismflow',certificateId,serverName:'www.microsoft.com',realityTarget:'www.microsoft.com:443',privateKey:'',publicKey:'',shortId:'',password:'',masquerade:false,native:false,nativeConfig:'',tlsMode:snapshot.state.access?.xhttpTls||'core',publicPort:publicTLSPort(snapshot.state.publicUrl),userIds:[]}
 }
 export function nativeTemplate(protocol:string):string {
  const password=Array.from(crypto.getRandomValues(new Uint8Array(18)),b=>b.toString(16).padStart(2,'0')).join('')

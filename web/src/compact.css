@@ -15,3 +15,10 @@
 @media(max-width:600px){.domain-settings .section-heading{align-items:flex-start;flex-wrap:wrap;gap:10px}.access-code{font-size:11px;padding:10px}}
 .domain-settings form{display:block}.domain-settings .form-grid{min-width:0;gap:12px 14px}.domain-settings .footnote{margin:10px 0 0}.domain-settings .form-actions{margin-top:12px}.domain-settings .field{margin-bottom:0}
 .access-config-intro{font-size:12px;line-height:1.7;color:var(--muted);margin:0 0 12px}
+
+.field-help-note[popover]{position:fixed;inset:auto;margin:0;box-sizing:border-box;max-height:calc(100dvh - 24px);overflow:auto;background:var(--solid);color:var(--text);box-shadow:0 8px 24px #0005;border:1px solid var(--line);padding:10px 12px;font-size:12px;font-weight:400;line-height:1.7}
+.domain-defaults{margin-top:14px}.domain-defaults summary{cursor:pointer;color:var(--muted);font-size:12px}.domain-defaults[open] summary{margin-bottom:12px}
+
+.access-addresses{display:grid;gap:4px;margin-top:10px;color:var(--muted);overflow-wrap:anywhere}
+
+.certificate-log-list article{padding:12px 0;border-bottom:1px solid var(--line)}.certificate-log-list small{display:block;color:var(--muted)}.certificate-log-list p{margin:6px 0;overflow-wrap:anywhere}.certificate-latest{font-size:11px;margin-top:6px}

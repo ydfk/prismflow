@@ -3,7 +3,7 @@ export async function request(path: string, method = 'GET', body?: unknown): Pro
   const headers: Record<string, string> = {}
   if (method !== 'GET') headers['X-CSRF-Token'] = csrf
   if (body !== undefined && !(body instanceof Blob)) headers['Content-Type'] = 'application/json'
-  const response = await fetch(`/api${path}`, { method, headers, credentials: 'same-origin', body: body instanceof Blob ? body : body === undefined ? undefined : JSON.stringify(body) })
+  const response = await fetch(new URL(`api${path}`, document.baseURI), { method, headers, credentials: 'same-origin', body: body instanceof Blob ? body : body === undefined ? undefined : JSON.stringify(body) })
   csrf = response.headers.get('X-CSRF-Token') || csrf
   if (!response.ok) {
     const failure = await response.json().catch(() => ({ error: `请求失败（${response.status}）` }))

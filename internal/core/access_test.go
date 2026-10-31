@@ -75,7 +75,13 @@ func TestPublicAddressValidation(t *testing.T) {
 	st := model.Default()
 	st.Access.PanelURL = "https://PANEL.example.com:443"
 	st.PublicURL = "https://panel.example.com"
-	if ValidateAccess(st) == nil {
-		t.Fatal("same public service address accepted")
+	if err := ValidateAccess(st); err != nil {
+		t.Fatal("shared domain rejected", err)
+	}
+	for _, path := range []string{"/", "/s", "/api", "/bad?path", "/manage/"} {
+		st.Access.AdminPath = path
+		if ValidateAccess(st) == nil {
+			t.Fatal("invalid management path accepted", path)
+		}
 	}
 }

@@ -1,6 +1,6 @@
 export const fieldGuidance:Record<string,{placeholder?:string;help?:string}>={
- '服务器域名 / 地址':{placeholder:'node.example.com 或 203.0.113.10',help:'客户端实际连接的服务器地址，不含 https://、端口或路径。默认继承统一域名；公网连接地址与监听地址不同。'},
- '默认服务器域名 / 地址':{placeholder:'node.example.com',help:'新建入口默认使用此地址。同步现有入口时修改连接地址；REALITY 握手目标单独设置。'},
+ '节点连接地址':{placeholder:'node.example.com 或 203.0.113.10',help:'默认使用统一域名，会写入订阅。只填域名或公网 IP，不含 https://、端口或路径。直连协议需解析到 VPS；反代 XHTTP 使用对应反代域名。REALITY 握手目标仍需另选外部站点，不是自己的域名。'},
+
  '名称':{placeholder:'例如：香港 · VLESS',help:'入口名称；订阅中会在前面拼接用户名。'},
  '用户名称':{placeholder:'例如：我的手机',help:'用于识别用户，也会成为订阅节点名称的前缀。'},
  '监听端口':{placeholder:'10000–65535',help:'新建自动随机生成五位端口；仍需在 VPS 和云防火墙开放对应 TCP/UDP。'},

@@ -6,11 +6,11 @@ export type Endpoint = {
 export type User = { id: string; name: string; enabled: boolean; endpointIds: string[]; createdAt: string }
 export type Certificate = { names?: string[]; id: string; domain: string; expiresAt: string; method: string; staging: boolean; renew: boolean; lastError: string; engine?: string; certPath?: string; keyPath?: string }
 export type Website = { disabled: boolean; title: string; description: string; template: string; bundle: string }
-export type AccessSettings = {baseDomain:string;panelUrl:string;xhttpTls:string}; export type State = { access: AccessSettings; revision: number; defaultHost: string; defaultCertificateId: string; endpoints: Endpoint[]; users: User[]; certificates: Certificate[]; website: Website; publicUrl: string; retentionDays: number; traffic: TrafficSettings }
+export type AccessSettings = {baseDomain:string;panelUrl:string;xhttpTls:string;adminPath?:string}; export type State = { access: AccessSettings; revision: number; defaultHost: string; defaultCertificateId: string; endpoints: Endpoint[]; users: User[]; certificates: Certificate[]; website: Website; publicUrl: string; retentionDays: number; traffic: TrafficSettings }
 export type Point = { time: number; protocol: string; upload: number; download: number }
 export type Snapshot = { traffic: TrafficSummary; state: State; appliedRevision: number; core: { available: boolean; running: boolean; targetVersion: string }; metrics: { online: boolean; rates: Point[]; sampledAt: string; intervalSeconds: number } }
 export type Protocol = { id: string; name: string; summary: string; detail: string; transports: string[]; securities: string[]; network: string }
-export type Job = { id: string; domain: string; status: string; message: string; createdAt: string }
+export type Job = { certificateId?:string; operation?:string; updatedAt?:string; id: string; domain: string; status: string; message: string; createdAt: string }
 export type Page = 'overview' | 'endpoints' | 'users' | 'certificates' | 'settings'
 export type PageProps = { snapshot: Snapshot; refresh: () => Promise<void>; notify: (message: string) => void }
 

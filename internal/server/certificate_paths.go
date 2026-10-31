@@ -69,11 +69,18 @@ func (s *Server) linkCertificatePath(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	mutationResult(w, s.mutate(func(st *model.State) error {
-		c := model.Certificate{ID: in.ID, Domain: in.Domain, Method: "path", CertPath: in.CertPath, KeyPath: in.KeyPath}
+	id := in.ID
+	if id == "" {
+		id = model.ID()
+	}
+	err := s.mutate(func(st *model.State) error {
+		c := model.Certificate{ID: id, Domain: in.Domain, Method: "path", CertPath: in.CertPath, KeyPath: in.KeyPath}
 		if in.ID != "" {
 			for i := range st.Certificates {
 				if st.Certificates[i].ID == in.ID {
+					if st.Certificates[i].Method != "path" {
+						return errors.New("仅系统路径证书可以修改文件关联")
+					}
 					st.Certificates[i] = c
 					return nil
 				}
@@ -83,10 +90,11 @@ func (s *Server) linkCertificatePath(w http.ResponseWriter, r *http.Request) {
 		if len(st.Certificates) >= 30 {
 			return errors.New("最多保存 30 张证书")
 		}
-		c.ID = model.ID()
 		st.Certificates = append(st.Certificates, c)
 		return nil
-	}))
+	})
+	s.recordCertificateResult(id, in.Domain, "关联系统证书", err)
+	mutationResult(w, err)
 }
 func (s *Server) certificateFiles(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Query().Get("path")
@@ -137,23 +145,37 @@ func (s *Server) refreshSystemCertificateFiles() {
 		}
 		if changed {
 			if s.Store.Set("state", next) == nil {
+				previous := s.state
 				s.state = next
+				for i, c := range next.Certificates {
+					if c.Method == "path" && c.LastError != previous.Certificates[i].LastError {
+						s.recordCertificateResult(c.ID, c.Domain, "自动读取系统证书", err)
+					}
+				}
 			}
 			s.Store.Event("系统证书暂不可用，已保留原运行证书")
 		}
 		return
 	}
 	changed := false
+	updated := []model.Certificate{}
 	for i, c := range next.Certificates {
 		if c.Method == "path" && (c.PEM != s.state.Certificates[i].PEM || c.Key != s.state.Certificates[i].Key || s.state.Certificates[i].LastError != "") {
 			changed = true
+			updated = append(updated, c)
 		}
 	}
 	if changed {
 		if err = s.saveLocked(s.ctx, next); err != nil {
 			s.Store.Event("系统证书更新未应用，保留运行配置")
+			for _, c := range updated {
+				s.recordCertificateResult(c.ID, c.Domain, "自动读取系统证书", err)
+			}
 		} else {
 			s.Store.Event("系统证书文件已自动重新加载")
+			for _, c := range updated {
+				s.recordCertificateResult(c.ID, c.Domain, "自动读取系统证书", nil)
+			}
 		}
 	}
 }

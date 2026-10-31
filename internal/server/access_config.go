@@ -50,6 +50,9 @@ func buildAccessConfig(st model.State, o Options) accessConfiguration {
 		if item.address == "" {
 			continue
 		}
+		if item.upstream == o.AdminListen && st.PublicURL != "" && normalizedOrigin(st.Access.PanelURL) == normalizedOrigin(st.PublicURL) {
+			continue
+		}
 		u, err := url.Parse(item.address)
 		if err != nil {
 			continue

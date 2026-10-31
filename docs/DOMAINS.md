@@ -1,81 +1,95 @@
-# 域名、反代与证书
+# 统一域名、路径与证书
 
-推荐沿用服务器已有的 Caddy / Nginx。DNS 只负责把域名指向 VPS；反代处理网页 HTTPS，Mihomo 负责代理协议。PrismFlow 不接管已有反代文件、80/443 端口或原证书的续期任务。
+PrismFlow 的网页只需一个域名和一个公开 HTTPS 端口，不要求端口必须是 443。Caddy/Nginx 负责 HTTPS 与转发，PrismFlow 负责网站、管理和订阅的路径分流。
 
-## 先确定三个地址
+## 入口约定
 
-在「域名与证书 → 公网访问设置」填写，基础域名只是可选的建议地址生成器：
+以 `https://example.com` 为例：
 
-| 地址 | 示例 | 实际上游 |
-| --- | --- | --- |
-| 面板公网地址 | `https://panel.example.com` | `127.0.0.1:8080`，管理界面与 API |
-| 公开订阅地址 | `https://sub.example.com` | `127.0.0.1:8081`，订阅与可选网站 |
-| 默认节点地址 | `node.example.com` | 由具体协议决定端口和 TLS 方式 |
+| 地址 | 用途 |
+| --- | --- |
+| `https://example.com/` | 伪装网站；关闭网站时此路径返回 404 |
+| `https://example.com/manage/` | 管理面板；管理路径可修改 |
+| `https://example.com/s/用户令牌` | Mihomo 订阅；追加 `?format=links` 获取分享链接 |
 
-`*.example.com` 的 A/AAAA 记录可以指向同一 VPS，但 DNS 泛解析不会自动创建 HTTPS 站点，也不代表已经有泛域名证书。若 AAAA 指向的服务器不可达，客户端可能连接失败；Cloudflare 的普通 HTTP 代理不能直接承载 REALITY、AnyTLS 或 Hysteria2，应按协议使用 DNS-only 记录。
+在「域名与证书 → 统一域名与证书」填写统一访问地址和管理路径。新协议默认使用这个域名；如需迁移已有协议，显式勾选“同时更新已有协议的地址与反代端口”。管理路径不是密码，管理员登录、会话与 CSRF 校验仍然生效。修改管理路径后旧路径失效；新地址需要以 `/` 结尾，服务会自动重定向。
 
-三个地址可使用不同的独立域名，无需共享基础域名。面板与订阅使用不同的域名或端口；不支持以 URL 子目录部署。无域名时可以仅用 SSH 隧道管理面板、创建 REALITY 等无需自有证书的入口。
+浏览器、前端静态资源和管理 API 都在管理路径下，例如 `/manage/api/state`。根路径 `/api/state` 不提供管理接口。关闭伪装网站不影响管理、订阅和 ACME 验证。
 
-保存只影响后续新建默认值，不会批量改写已有节点、SNI 或证书。旧数据的 `defaultHost`、`defaultCertificateId`、`publicUrl` 保留；缺少 TLS 方式的历史入口仍按原方式直连。
+统一域名后新生成的反代配置将整个站点转发到 PrismFlow **公开服务 8081**。8080 保留为本机管理/兼容入口；9097 是内核控制器，继续仅监听本机。
 
-## 选择由谁处理 TLS
+## 自定义 HTTPS 端口
 
-| 协议 | 客户端连接 | TLS 终止与证书 |
-| --- | --- | --- |
-| VLESS REALITY Vision | `node.example.com:随机五位端口/TCP` | Mihomo REALITY；无需自有证书；握手目标和 SNI 独立配置 |
-| VLESS XHTTP · 外部 TLS | `node.example.com:443`，或指定公网端口 | Caddy / Nginx 维护证书，按路径转发到 `127.0.0.1:随机五位端口` |
-| VLESS XHTTP · 内核 TLS | `node.example.com:随机五位端口/TCP` | Mihomo 使用绑定的证书 |
-| AnyTLS | `node.example.com:随机五位端口/TCP` | Mihomo 使用绑定的证书 |
-| Hysteria2 | `node.example.com:随机五位端口/UDP` | Mihomo 使用绑定的证书 |
+统一访问地址可以填 `https://example.com:8443` 或 `https://example.com:10443`。管理路径、订阅链接、来源校验及部署检查均保留该端口；新建反代 TLS 的 XHTTP 也继承该端口，仍可单独修改。已有入口只在显式勾选同步时更新反代公网端口，直连协议的随机监听端口不改变。
 
-新安装默认建议 XHTTP 外部 TLS，可在快速创建或普通创建中切换。外部 TLS 仅开放表单 VLESS + XHTTP + TLS：客户端订阅仍启用 TLS 和证书验证，服务端的明文接收严格限制在回环地址。订阅导出公网端口，入口表格同时显示本机端口；内部端口无需对公网开放。
+Caddy 对应站点写为 `https://example.com:8443`，Nginx 使用 `listen 8443 ssl`；按实际部署同步 Docker 端口映射和防火墙放行规则。只改变服务器监听、不改变统一访问地址，会让生成的链接仍指向旧端口。若已设置 PRISMFLOW_ORIGIN，也应改成包含自定义端口的完整来源，例如 https://example.com:8443（不包含管理路径），并重启或重建服务以加载环境变量，否则会出现“来源不允许”。
 
-普通 HTTP 反代不会自动代理任意 TCP/UDP 协议。除外部 XHTTP 外，各协议仍使用自己的端口；多个 XHTTP 可在同一公网域名和端口使用不同路径，路径不能相同或互相包含。通用 L4 分流、跨主机明文上游和所有协议共用 443 不在此方案中。
+网页使用 8443 不改变 CA 的验证端口要求：HTTP-01 仍只能使用公网 80；无法开放 80 时可使用 Cloudflare DNS-01。参见 [Let's Encrypt 验证方式](https://letsencrypt.org/docs/challenge-types/)。
 
-## 使用已有 Caddy / Nginx
+## Caddy 部署
 
-1. 先保存公网访问设置，再创建需要的外部 TLS XHTTP 入口。
-2. 打开「反代配置与检查」，复制 Caddy 或 Nginx 片段，合并到现有站点中。同域名已有 server / site 时合并路由，不重复定义；不要整体覆盖已有配置。
-3. Caddy 可沿用自动 HTTPS，也可在现有站点沿用已配置的 `tls` 证书。Nginx 片段中的 `/etc/ssl/prismflow/域名/` 是占位路径，必须替换为现有证书文件。
-4. XHTTP 路径必须原样转发，不剥离前缀；Nginx 公网监听需启用 HTTP/2，关闭请求与响应缓冲。片段采用兼容旧版的 `listen 443 ssl http2`；新版本可按官方语法调整。
-5. 校验配置后重载，再点击「检查公网访问」。入口本身在协议列表单独检测。
+将以下站点合并到已有 Caddyfile，替换域名：
 
-```bash
-# 使用实际的配置路径；选择已经安装的反代执行
-sudo caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
-sudo systemctl reload caddy
+```caddy
+example.com {
+    reverse_proxy 127.0.0.1:8081
+}
 ```
 
-```bash
-sudo nginx -t
-sudo systemctl reload nginx
-```
+Caddy 自动管理网页 HTTPS；无需为管理和订阅各建一个站点。Caddy 与 PrismFlow 必须能访问同一宿主机回环地址：宿主机 Caddy 可以直接连接，容器 Caddy 可使用 Linux host 网络。独立 bridge 容器的 `127.0.0.1` 指容器自己，无法直接访问宿主机回环服务。
 
-面板保存的公网地址用于来源校验。若环境中已有 `PRISMFLOW_ORIGIN`，它的优先级更高；修改 `/etc/prismflow/environment` 或 Compose 环境后重启服务。首次可经 SSH 隧道设置，保存面板域名后，本机回环连接的 localhost / 回环 IP 隧道仍可继续配置；显式设置 ORIGIN 时遵循该环境策略。反代就绪后通过新的面板地址登录。设置错误时仍可通过 SSH 修正环境变量恢复访问。
+Nginx 使用同一 server，将 `location /` 原样反代到 `http://127.0.0.1:8081`，保留 Host 和 X-Forwarded-Proto，并配置原有 HTTPS 证书。面板中的「反代配置与检查」提供可复制的 Caddy/Nginx 配置。先合并、校验并重载反代，再在面板检查；PrismFlow 不直接改写反代文件。
 
-生成的“服务环境”是部署建议，不会自动更改监听地址；已有原生安装和生产 Docker 默认就是回环监听。Docker 使用 Linux host 网络，反代也应位于宿主或同一 host 网络；bridge 容器内的 `127.0.0.1` 不是宿主机。
+若设置了 `PRISMFLOW_ORIGIN`，其值应为 `https://example.com`，不包含管理路径。它优先于面板保存的统一地址；通过 HTTPS 反代首次初始化前也应配置此变量，避免来源校验失败。
 
-检查会验证 DNS、TLS 信任与 PrismFlow 的服务角色标识，拒绝跟随重定向，避免把登录页或错误上游判断为正常；网站关闭时标识仍可用。结果只代表服务器视角，公网客户端可达性需实测。XHTTP 节点域名的未匹配路径默认 404；伪装网站展示在订阅域名首页，需要其他网站回落时自行合并对应规则。
+## 网页证书与协议证书
 
-## 复用证书，不重复管理
+同一个域名可以被网页和代理协议共同使用，但证书由实际处理 TLS 的程序读取：
 
-- **仅网页及外部 XHTTP**：由反代维护证书，不需要把私钥交给 PrismFlow。
-- **AnyTLS / Hysteria2 等内核 TLS**：选择「使用系统证书」，填写已有证书链与私钥的绝对路径；原工具继续续期，PrismFlow 每 30 秒检测文件变更并安全应用，失败时保留原运行证书。
-- **希望由面板签发节点证书**：选择 acme.sh 或内置 ACME。普通域名可使用 HTTP-01 或 Cloudflare DNS-01；`*.example.com` 只能使用 DNS-01。泛域名只覆盖一级子域，不自动覆盖 `example.com` 或多级子域；客户端 SNI 需要具体域名。
+| 用途 | 证书处理方式 |
+| --- | --- |
+| 网站、管理、订阅、反代 TLS 的 XHTTP | Caddy/Nginx 的网页 HTTPS 证书 |
+| AnyTLS、Hysteria2、TUIC、内核 TLS 等 | Mihomo 读取面板关联的协议证书 |
+| VLESS REALITY | 无需自有证书；握手目标及 SNI 仍使用合适的外部站点 |
 
-证书表格展示实际 SAN 范围和所绑定的托管节点。可以关联覆盖多个节点的同一张泛域名证书；绑定后仍由后端校验证书是否覆盖具体 SNI。
+协议默认证书可以选择已有系统路径或自动申请。已有 Caddy/Nginx 证书可以通过只读挂载和正确的读取权限复用；证书与私钥路径须在 PrismFlow 进程/容器内可读，UID 10001 不会自动获得 root 文件的访问权限。Let's Encrypt live 符号链接还需要相应 archive 目录。
 
-Caddy 私有数据目录不保证其他服务可读，不应简单放开整个目录权限。优先由原续期工具的 deploy hook 将证书原子更新到专用共享目录，并给所需服务账户最小读取权限。PrismFlow 的系统路径关联不会修改原文件或接管续期。
+- **系统文件**：原工具续期；PrismFlow 每 30 秒检测文件变更，校验后自动应用到引用它的协议。读取或校验失败保留原运行证书。
+- **acme.sh / 内置 ACME 自动申请**：默认使用正式 CA，启用自动续期。每 15 分钟检查，到期前 30 天尝试，同一证书尝试间隔至少 12 小时；成功后自动应用到引用它的协议，失败保留原证书并记录日志。
+- **手动导入 PEM**：由管理员在到期前替换，不自动续期。
 
-原生服务账户为 `prismflow`，需要读取文件及遍历上层目录；systemd `ProtectHome` 默认限制 home 目录。Docker 使用 UID 10001，需只读挂载证书目录并具备读取权限；必要时通过 `group_add` 加入已有证书读取组的数值 GID。不要把私钥设为全局可读。
+自动证书不能通过上传覆盖，以免丢失续期账户和验证信息。来源列只显示系统文件、手动导入或自动申请引擎；“测试 CA”属于状态，表示证书不受普通客户端信任。测试 CA 仅作为排查选项，默认关闭；已有测试证书可点击“申请正式证书”，通过正式验证后替换。
 
-```yaml
-# 合并到现有 prismflow 服务的 volumes；live 链接还依赖 archive 目录
-volumes:
-  - ./data:/data
-  - /etc/letsencrypt:/etc/letsencrypt:ro
-```
+证书每行可打开操作记录，包含申请、续期、文件读取和失败原因；最近 200 条全局证书操作记录保存在本机数据库，重启仍保留。不会记录私钥或 DNS API 凭据，旧版本没有保存的记录无法补回。失败的新申请也会显示在列表中。
 
-面板自己的 HTTP-01 申请还需要将对应域名公网 80 端口的 `/.well-known/acme-challenge/` 转发到 8081。已有反代为同域名续期时，优先直接复用它的证书或改用 DNS-01，避免两套工具争用挑战路径。
+如果希望 Caddy/Nginx 直接使用 PrismFlow 申请的证书，需要另外配置共享文件和反代证书重载；本版不会自动改写或重载已有反代。默认建议由反代维护网页证书，PrismFlow 维护 Mihomo 的证书。
 
-依据：[Caddy reverse_proxy](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy)、[Nginx proxy 模块](https://nginx.org/en/docs/http/ngx_http_proxy_module.html)、[Let's Encrypt 验证方式](https://letsencrypt.org/docs/challenge-types/)。
+## 验证域名与申请证书
+
+DNS A/AAAA 指向 VPS；同一个域名即可，不必先设置泛域名。若使用泛解析，它不会自动创建 HTTPS 站点或证书。不可达的 AAAA 可能使客户端连接失败。直连 REALITY/AnyTLS/Hysteria2 应使用 DNS-only 解析，不能经过普通 HTTP CDN 代理。
+
+HTTP-01 需要将公网 TCP 80 的 `/.well-known/acme-challenge/` 转发到公开服务 8081；HTTPS 站点的转发不能代替 HTTP 验证路径。Cloudflare DNS-01 需要目标 Zone 的读取及 DNS 编辑权限。泛域名只能通过 DNS-01 申请，且客户端使用具体域名作为 SNI。
+
+## 代理协议端口
+
+网页共用 443 不等于所有代理协议共用 443：
+
+| 协议 | 默认连接 |
+| --- | --- |
+| VLESS REALITY Vision | `example.com:随机五位端口/TCP` |
+| VLESS XHTTP · 反代 TLS | `example.com:443`，根据独立路径转发到本机随机端口 |
+| VLESS XHTTP · 内核 TLS、AnyTLS | `example.com:随机五位端口/TCP` |
+| Hysteria2、TUIC | `example.com:随机五位端口/UDP` |
+
+XHTTP 路径必须保留原样，不能与管理路径、订阅 `/s` 或 ACME 路径冲突；多个 XHTTP 路径也不能相同或互相包含。Nginx 必须开启 HTTP/2、关闭请求/响应缓冲。内核只在回环地址接收反代 XHTTP，公网订阅仍启用 TLS 校验。
+
+REALITY 的握手目标是外部站点，不是自己的统一域名；它与订阅中用于连接 VPS 的域名有不同作用。
+
+## 从旧的多域名部署迁移
+
+1. 备份数据目录，保留 SQLite 与 master.key；更新 PrismFlow。
+2. 通过原本机管理入口或旧管理域名，保存统一访问地址、管理路径和协议默认证书。先确认已有 `PRISMFLOW_ORIGIN` 是否与新地址一致。
+3. 将统一站点的默认上游从 8080 改为 **8081**，保留需要的 XHTTP 独立路由，校验并重载 Caddy/Nginx。
+4. 打开 `https://example.com/manage/` 登录，确认首页是伪装网站，订阅链接指向 `/s/令牌`，再执行入口检测和实际客户端验证。
+
+旧的多域名设置仍可读取，已有协议不会在升级时被批量改写。全新安装也可先通过 SSH 隧道访问本机 8080 配置；公开站点配置完成后使用管理路径访问。
