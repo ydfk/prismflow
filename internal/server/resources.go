@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
@@ -237,10 +238,9 @@ func (s *Server) subscription(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-PrismFlow-Traffic-Status", "current")
 	}
 	w.Header().Set("Profile-Update-Interval", "6")
-	w.Header().Set("Content-Disposition", `attachment; filename="prismflow.yaml"`)
 	if r.URL.Query().Get("format") == "links" {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		_, _ = fmt.Fprint(w, core.Links(applied, *user))
+		_, _ = fmt.Fprint(w, base64.StdEncoding.EncodeToString([]byte(core.Links(applied, *user))))
 		return
 	}
 	b, err := core.Subscription(applied, *user)
@@ -248,6 +248,7 @@ func (s *Server) subscription(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 409)
 		return
 	}
+	w.Header().Set("Content-Disposition", `attachment; filename="prismflow.yaml"`)
 	w.Header().Set("Content-Type", "text/yaml; charset=utf-8")
 	_, _ = w.Write(b)
 }
