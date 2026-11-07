@@ -7,7 +7,7 @@ export async function request(path: string, method = 'GET', body?: unknown): Pro
   csrf = response.headers.get('X-CSRF-Token') || csrf
   if (!response.ok) {
     const failure = await response.json().catch(() => ({ error: `请求失败（${response.status}）` }))
-    if (response.status === 401 && path !== '/session') window.dispatchEvent(new Event('session-expired'))
+    if (response.status === 401 && path !== '/session' && path !== '/session/passkey') window.dispatchEvent(new Event('session-expired'))
     throw new Error(failure.error || '操作失败')
   }
   return response

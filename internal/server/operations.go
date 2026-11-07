@@ -83,15 +83,23 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 }
 func (s *Server) history(w http.ResponseWriter, r *http.Request) {
 	hours := 24
+	bucket := int64(300)
 	switch r.URL.Query().Get("range") {
 	case "1h":
 		hours = 1
+		bucket = 60
 	case "7d":
 		hours = 168
+		bucket = 1800
 	case "30d":
 		hours = 720
+		bucket = 7200
 	}
-	points, err := s.Metrics.History(time.Now().Add(-time.Duration(hours) * time.Hour).Unix())
+	since := time.Now().Add(-time.Duration(hours) * time.Hour).Unix()
+	if r.URL.Query().Get("bucket") != "auto" {
+		bucket = 300
+	}
+	points, err := s.Metrics.BucketedHistory(since, bucket)
 	if err != nil {
 		fail(w, 500, errors.New("读取流量历史失败"))
 		return

@@ -15,4 +15,7 @@
 .brand-mark{padding:0;background:transparent;border-radius:0}
 .brand img{filter:none;width:36px;height:36px}
 @media(max-width:900px){.settings-service,.settings-security,.settings-traffic{grid-template-columns:1fr}}
+.passkey-login{display:grid;gap:8px;margin-top:10px}
+.passkey-login>.button{width:100%}
+.passkey-details{overflow-wrap:anywhere}
 @media(max-width:500px){.settings-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}.settings-tabs>button{padding:10px 8px}.brand img{width:34px;height:34px}}

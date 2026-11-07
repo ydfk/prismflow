@@ -22,9 +22,9 @@ export function Field({ label, hint, help, children }: { label: string; hint?: s
 export function Notice({ children, error = false }: { children: ReactNode; error?: boolean }) { return <div role={error ? 'alert' : 'status'} className={`notice ${error ? 'error' : ''}`}><AlertCircle size={17} /><span>{children}</span></div> }
 export function Empty({ title, description, action }: { title: string; description: string; action?: ReactNode }) { return <div className="empty"><div className="empty-symbol"><Plus size={24} /></div><h3>{title}</h3><p>{description}</p>{action}</div> }
 export function Editor({title,children,onClose}:{title:string;children:ReactNode;onClose:()=>void}){return <Modal title={title} onClose={onClose}>{children}</Modal>}
-export function AsyncForm({ children, submit, label = '保存配置', onDone }: { children: ReactNode; submit: () => Promise<unknown>; label?: string; onDone?: () => void }) {
+export function AsyncForm({ children, submit, label = '保存配置', onDone, disabled }: { children: ReactNode; submit: () => Promise<unknown>; label?: string; onDone?: () => void; disabled?: boolean }) {
   const [busy, setBusy] = useState(false); const [error, setError] = useState('')
-  async function handle(event: FormEvent) { event.preventDefault(); setBusy(true); setError(''); try { await submit(); onDone?.() } catch (e) { setError((e as Error).message) } finally { setBusy(false) } }
-  return <form onSubmit={handle}>{children}{error && <Notice error>{error}</Notice>}<div className="form-actions"><Button className="primary" type="submit" busy={busy}><Check size={16} />{label}</Button></div></form>
+  async function handle(event: FormEvent) { event.preventDefault(); if (busy || disabled) return; setBusy(true); setError(''); try { await submit(); onDone?.() } catch (e) { setError((e as Error).message) } finally { setBusy(false) } }
+  return <form onSubmit={handle}>{children}{error && <Notice error>{error}</Notice>}<div className="form-actions"><Button className="primary" type="submit" busy={busy} disabled={disabled}><Check size={16} />{label}</Button></div></form>
 }
 export function Badge({ children, active = true }: { children: ReactNode; active?: boolean }) { return <span className={`badge ${active ? '' : 'muted'}`}><i />{children}</span> }

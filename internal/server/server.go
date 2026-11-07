@@ -40,6 +40,7 @@ type Server struct {
 	authMu         sync.Mutex
 	sessions       map[string]session
 	attempts       map[string]attempt
+	passkeyFlows   map[string]passkeyFlow
 	setupToken     string
 	jobsMu         sync.Mutex
 	jobs           map[string]Job
@@ -173,7 +174,13 @@ func (s *Server) AdminHandler() http.Handler {
 	mux.HandleFunc("GET /api/status", s.status)
 	mux.HandleFunc("POST /api/setup", s.setup)
 	mux.HandleFunc("POST /api/session", s.login)
+	mux.HandleFunc("POST /api/session/passkey/options", s.beginPasskeyLogin)
+	mux.HandleFunc("POST /api/session/passkey", s.finishPasskeyLogin)
 	api := http.NewServeMux()
+	api.HandleFunc("GET /api/passkeys", s.listPasskeys)
+	api.HandleFunc("POST /api/passkeys/options", s.beginPasskeyRegistration)
+	api.HandleFunc("POST /api/passkeys", s.finishPasskeyRegistration)
+	api.HandleFunc("DELETE /api/passkeys/{id}", s.deletePasskey)
 	api.HandleFunc("GET /api/updates", s.updateStatus)
 	api.HandleFunc("POST /api/updates/check", s.checkUpdate)
 	api.HandleFunc("POST /api/updates/install", s.requestUpdate)

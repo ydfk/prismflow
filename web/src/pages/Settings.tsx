@@ -6,6 +6,7 @@ import UpdatePanel from './UpdatePanel'
 import Website from './Website'
 import TrafficSettings from './TrafficSettings'
 import SettingsBackup from './SettingsBackup'
+import PasskeySettings from './PasskeySettings'
 import type { PageProps } from '../types'
 import { AsyncForm, Field, Notice } from '../ui'
 
@@ -56,7 +57,10 @@ export default function Settings({snapshot,refresh,notify}:PageProps){
   <div className="settings-panel" id={`${prefix}-panel-website`} role="tabpanel" aria-labelledby={`${prefix}-tab-website`} hidden={section!=='website'}><Website snapshot={snapshot} refresh={refresh} notify={notify}/></div>
   <div className="settings-panel settings-security" id={`${prefix}-panel-security`} role="tabpanel" aria-labelledby={`${prefix}-tab-security`} hidden={section!=='security'}>
    <section className="surface"><div className="section-heading"><h2>管理员密码</h2></div><AsyncForm label="更新密码并退出" submit={async()=>{await api('/password','POST',{current,password});window.dispatchEvent(new Event('session-expired'))}}><Field label="当前密码"><input type="password" required autoComplete="current-password" value={current} onChange={e=>setCurrent(e.target.value)}/></Field><Field label="新密码"><input type="password" required minLength={12} maxLength={72} autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)}/></Field></AsyncForm></section>
-   <SettingsBackup refresh={refresh} notify={notify}/>
+   <div className="settings-column">
+    {section==='security' && <PasskeySettings notify={notify}/>}
+    <SettingsBackup refresh={refresh} notify={notify}/>
+   </div>
   </div>
  </div>
 }

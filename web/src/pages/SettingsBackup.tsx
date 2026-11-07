@@ -30,7 +30,7 @@ export default function SettingsBackup({refresh,notify}:Pick<PageProps,'refresh'
  }
  return <section className="surface settings-backup">
   <div className="section-heading"><h2>加密备份与恢复</h2><span className="subtle">AES-256-GCM</span></div>
-  <p className="section-description">备份包含协议凭据、用户、当前证书、内置 ACME 账户和自定义网站。acme.sh 账户、系统证书原文件请另行备份；不包含管理员密码、流量历史和日志。</p>
+  <p className="section-description">备份包含协议凭据、用户、当前证书、内置 ACME 账户和自定义网站。acme.sh 账户、系统证书原文件请另行备份；不包含管理员密码、Passkey、流量历史和日志。</p>
   {error&&<Notice error>{error}</Notice>}
   <Field label="备份密码" hint="至少 12 字节；恢复时使用创建备份时的密码。"><input type="password" minLength={12} autoComplete="new-password" value={passphrase} onChange={e=>setPassphrase(e.target.value)}/></Field>
   <div className="button-wrap"><Button busy={busy} disabled={passphrase.length<12} onClick={backup}><Download size={16}/>下载备份</Button><Button disabled={busy||passphrase.length<12} onClick={()=>fileInput.current?.click()}><Upload size={16}/>恢复备份</Button><input ref={fileInput} type="file" accept=".pfb" hidden disabled={busy||passphrase.length<12} onChange={e=>{restore(e.target.files?.[0]);e.target.value=''}}/></div>

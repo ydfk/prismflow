@@ -45,6 +45,7 @@ type Collector struct {
 	initialized bool
 	lastAt      time.Time
 	current     []Point
+	connections map[string]int
 	Online      bool
 }
 
@@ -75,6 +76,7 @@ func (c *Collector) Sample(ctx context.Context) {
 		c.initialized = false
 		c.last = nil
 		c.current = nil
+		c.connections = nil
 		return
 	}
 	c.Online = true
@@ -87,6 +89,7 @@ func (c *Collector) Sample(ctx context.Context) {
 	}
 	bucket := map[string]Counts{}
 	next := map[string]Counts{}
+	connections := map[string]int{"total": len(snapshot.Connections)}
 	for _, conn := range snapshot.Connections {
 		current := Counts{conn.Upload, conn.Download}
 		next[conn.ID] = current
@@ -95,11 +98,13 @@ func (c *Collector) Sample(ctx context.Context) {
 		if p == "" {
 			p = "unknown"
 		}
+		connections[p]++
 		b := bucket[p]
 		b.Upload += delta(current.Upload, previous.Upload)
 		b.Download += delta(current.Download, previous.Download)
 		bucket[p] = b
 	}
+	c.connections = connections
 	current := Counts{snapshot.Upload, snapshot.Download}
 	if !c.initialized {
 		c.initialized = true
@@ -139,10 +144,14 @@ func (c *Collector) Summary() map[string]any {
 	if points == nil || !c.Online {
 		points = []Point{}
 	}
-	return map[string]any{"online": c.Online, "rates": points, "sampledAt": c.lastAt, "intervalSeconds": 5, "protocolAccounting": "sampled-active-connections"}
+	return map[string]any{"online": c.Online, "rates": points, "activeConnections": c.connections, "sampledAt": c.lastAt, "intervalSeconds": 5, "protocolAccounting": "sampled-active-connections"}
 }
 func (c *Collector) History(since int64) ([]Point, error) {
-	rows, err := c.Store.DB.Query("SELECT (time/300)*300,protocol,SUM(upload),SUM(download) FROM samples WHERE time>=? GROUP BY time/300,protocol ORDER BY time/300", since)
+	return c.BucketedHistory(since, 300)
+}
+
+func (c *Collector) BucketedHistory(since, bucketSeconds int64) ([]Point, error) {
+	rows, err := c.Store.DB.Query("SELECT (time/?2)*?2,protocol,SUM(upload),SUM(download) FROM samples WHERE time>=?1 GROUP BY 1,2 ORDER BY 1,2", since, bucketSeconds)
 	if err != nil {
 		return nil, err
 	}

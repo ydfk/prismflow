@@ -7,21 +7,25 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"golang.org/x/crypto/bcrypt"
 	"io"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
-	"prismflow/internal/model"
 	"strings"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
+
+	"prismflow/internal/model"
 )
 
 type adminAccount struct {
-	Username string `json:"username"`
-	Hash     string `json:"hash"`
+	Username  string          `json:"username"`
+	Hash      string          `json:"hash"`
+	PasskeyID []byte          `json:"passkeyId,omitempty"`
+	Passkeys  []storedPasskey `json:"passkeys,omitempty"`
 }
 type session struct {
 	CSRF    string
@@ -129,7 +133,7 @@ func (s *Server) setup(w http.ResponseWriter, r *http.Request) {
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(body.Password), 12)
 	if err == nil {
-		err = s.Store.Set("admin", adminAccount{body.Username, string(hash)})
+		err = s.Store.Set("admin", adminAccount{Username: body.Username, Hash: string(hash)})
 	}
 	if err != nil {
 		fail(w, 500, errors.New("无法保存管理员"))
@@ -152,30 +156,48 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &body) {
 		return
 	}
-	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
 	s.authMu.Lock()
 	defer s.authMu.Unlock()
 	now := time.Now()
-	for key, v := range s.attempts {
-		if now.After(v.Until) {
-			delete(s.attempts, key)
-		}
-	}
-	a := s.attempts[ip]
-	if a.Count >= 5 || len(s.attempts) > 1024 {
-		fail(w, 429, errors.New("尝试过多，请 15 分钟后重试"))
+	key := attemptKey(r, "password")
+	if !s.allowAttempt(w, key, now) {
 		return
 	}
-	a.Count++
-	a.Until = now.Add(15 * time.Minute)
-	s.attempts[ip] = a
 	var account adminAccount
 	err := s.Store.Get("admin", &account)
 	if err != nil || !validPassword(body.Password) || bcrypt.CompareHashAndPassword([]byte(account.Hash), []byte(body.Password)) != nil || body.Username != account.Username {
 		fail(w, 401, errors.New("用户名或密码不正确"))
 		return
 	}
-	delete(s.attempts, ip)
+	delete(s.attempts, key)
+	s.issueSession(w, now, s.secureCookie(r))
+}
+
+func attemptKey(r *http.Request, method string) string {
+	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+	return method + ":" + ip
+}
+
+// 调用方持有 authMu。
+func (s *Server) allowAttempt(w http.ResponseWriter, key string, now time.Time) bool {
+	for key, v := range s.attempts {
+		if now.After(v.Until) {
+			delete(s.attempts, key)
+		}
+	}
+	a := s.attempts[key]
+	if a.Count >= 5 || len(s.attempts) > 1024 {
+		fail(w, 429, errors.New("尝试过多，请 15 分钟后重试"))
+		return false
+	}
+	a.Count++
+	a.Until = now.Add(15 * time.Minute)
+	s.attempts[key] = a
+	return true
+}
+
+// 密码和 Passkey 使用同一种管理员会话。调用方持有 authMu。
+func (s *Server) issueSession(w http.ResponseWriter, now time.Time, secure bool) {
 	for key, v := range s.sessions {
 		if now.After(v.Expires) {
 			delete(s.sessions, key)
@@ -188,7 +210,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	token := model.Token(32)
 	sess := session{model.Token(24), now.Add(12 * time.Hour)}
 	s.sessions[tokenHash(token)] = sess
-	http.SetCookie(w, &http.Cookie{Name: "prismflow_session", Value: token, Path: "/", HttpOnly: true, Secure: s.secureCookie(r), SameSite: http.SameSiteStrictMode, MaxAge: 43200})
+	http.SetCookie(w, &http.Cookie{Name: "prismflow_session", Value: token, Path: "/", HttpOnly: true, Secure: secure, SameSite: http.SameSiteStrictMode, MaxAge: 43200})
 	respond(w, 200, map[string]string{"csrf": sess.CSRF})
 }
 func (s *Server) auth(next http.Handler) http.Handler {
