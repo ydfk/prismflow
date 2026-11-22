@@ -56,8 +56,12 @@ func TestTrafficHistoryAPIAuthenticatesAndFiltersSelectedSlot(t *testing.T) {
 		t.Fatal(err)
 	}
 	w := call(t, handler, "GET", "/api/metrics/history"+query+"&ip=2001:0DB8::1", nil, cookie, "")
-	var history struct{ Buckets []metrics.HistoryBucket }
+	var history struct {
+		Starts  []int64
+		Buckets []metrics.HistoryBucket
+	}
 	if w.Code != 200 || w.Header().Get("Cache-Control") != "no-store" || json.Unmarshal(w.Body.Bytes(), &history) != nil ||
+		len(history.Starts) != 1440 || history.Starts[0] != minute || history.Starts[2] != minute+120 ||
 		len(history.Buckets) != 2 || history.Buckets[0].Time != minute || history.Buckets[1].Upload != 6 {
 		t.Fatal(w.Code, w.Body.String())
 	}

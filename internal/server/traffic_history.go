@@ -105,7 +105,9 @@ func (s *Server) calendarHistory(w http.ResponseWriter, r *http.Request) {
 		fail(w, 500, errors.New("读取流量历史失败"))
 		return
 	}
-	respond(w, 200, map[string]any{"from": bounds[0], "until": bounds[len(bounds)-1], "buckets": buckets})
+	respond(w, 200, map[string]any{
+		"from": bounds[0], "until": bounds[len(bounds)-1], "starts": bounds[:len(bounds)-1], "buckets": buckets,
+	})
 }
 
 func (s *Server) trafficBreakdown(w http.ResponseWriter, r *http.Request) {

@@ -3,6 +3,7 @@ import { Activity, ArrowDownLeft, ArrowRight, ArrowUpRight } from 'lucide-react'
 import { api, bytes } from '../api'
 import type { Point, Snapshot } from '../types'
 import { Notice } from '../ui'
+import { TrafficChart } from './TrafficChart'
 
 const ranges = {
   '1h': { label: '最近 1 小时', step: 60, bucket: '1 分钟' },
@@ -17,7 +18,6 @@ export const protocolName = (name: string) => name === 'unknown' ? '未识别协
 const amount = (value?: number) => value === undefined ? '—' : bytes(value)
 const totalBytes = (counts?: Totals) => counts ? counts.upload + counts.download : 0
 const percent = new Intl.NumberFormat('zh-CN', { style: 'percent', maximumFractionDigits: 1 })
-const chartDate = new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 const chartTime = new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' })
 
 function useTrafficHistory(range: Range) {
@@ -150,37 +150,4 @@ export function ProtocolUsage({ traffic }: { traffic: TrafficOverviewState }) {
     </div> : <div className="inline-empty"><Activity size={24}/><p>{result ? '暂无协议用量' : '正在读取流量…'}</p></div>}
     <p className="usage-note">协议用量按活动连接采样估算，短连接可能漏计。占比基于表中已采样的流量；活动连接为实时快照。</p>
   </section>
-}
-
-type ChartPoint = Totals & { time: number; end?: number }
-type ChartProps = {
-  points: ChartPoint[]; step?: number; label: string; emptyLabel: string
-  window?: { from: number; until: number }; formatTick?: (seconds: number) => string
-}
-
-export function TrafficChart({ points, step, label, emptyLabel, window, formatTick = seconds => chartDate.format(seconds * 1000) }: ChartProps) {
-  if (!points.length) return <div className="traffic-chart traffic-empty"><div className="chart-placeholder">{emptyLabel}</div></div>
-  const first = window?.from ?? points[0].time
-  const last = window?.until ?? points[points.length - 1].time
-  const max = Math.max(...points.map(point => Math.max(point.upload, point.download)))
-  const x = (time: number) => first === last ? 380 : 20 + (time - first) / (last - first) * 720
-  const y = (value: number) => 158 - value / (max || 1) * 125
-  function path(direction: keyof Totals) {
-    return points.map((point, index) => {
-      const previous = points[index - 1]
-      const joined = previous && (previous.end ?? previous.time + (step ?? 0)) === point.time
-      const start = `${x(point.time)},${y(point[direction])}`
-      return joined ? `L${start}` : `M${start}h0.1`
-    }).join(' ')
-  }
-  return <div className="traffic-chart">
-    <div className="traffic-plot">
-      <div className="traffic-axis" aria-hidden="true"><span>{max ? bytes(max) : ''}</span><span>{max > 1 ? bytes(Math.floor(max / 2)) : ''}</span><span>0 B</span></div>
-      <svg viewBox="0 0 760 190" role="img" aria-label={`每 ${label}上传与下载趋势，峰值 ${bytes(max)}`} preserveAspectRatio="none">
-        {[33, 95.5, 158].map(line => <line key={line} x1="20" x2="740" y1={line} y2={line} className="grid-line"/>)}
-        <path d={path('download')} className="download-line"/><path d={path('upload')} className="upload-line"/>
-      </svg>
-    </div>
-    <div className="chart-ticks"><span>{formatTick(first)}</span>{first !== last && <span>{formatTick(last)}</span>}</div>
-  </div>
 }

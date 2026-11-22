@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { api, bytes } from '../api'
 import type { Snapshot } from '../types'
 import { Button, Field, Notice } from '../ui'
-import { protocolName, TrafficChart } from './TrafficOverview'
+import { protocolName } from './TrafficOverview'
+import { TrafficChart } from './TrafficChart'
 import { BreakdownTable, TimelineTable, type Breakdown, type HistoryBucket } from './TrafficHistoryTables'
 
 const granularities = { minute: '分钟', hour: '小时', day: '天' } as const
@@ -12,9 +13,10 @@ type Granularity = keyof typeof granularities
 type Group = keyof typeof groups
 type Filters = Partial<Record<Group, string>>
 type Range = { from: string; to: string; granularity: Granularity }
-type History = { from: number; until: number; buckets: HistoryBucket[] }
+type History = { from: number; until: number; starts?: number[]; buckets: HistoryBucket[] }
 const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
 const days = new Intl.DateTimeFormat('zh-CN', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' })
+const dayTicks = new Intl.DateTimeFormat('zh-CN', { timeZone: timezone, month: 'numeric', day: 'numeric' })
 const times = new Intl.DateTimeFormat('zh-CN', { timeZone: timezone, month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZoneName: 'shortOffset' })
 const emptyBuckets: HistoryBucket[] = []
 const presets = [{ label: '今天', days: 1 }, { label: '最近 7 天', days: 7 }, { label: '最近 30 天', days: 30 }]
@@ -59,6 +61,8 @@ export default function TrafficHistory({ snapshot }: { snapshot: Snapshot }) {
   if (slot !== undefined) rankQuery.set('slot', String(slot))
   const breakdown = useTrafficQuery<Breakdown>(`/metrics/breakdown?${rankQuery}`, revision)
   const buckets = history?.value?.buckets ?? emptyBuckets
+  const selectedIndex = buckets.findIndex(bucket => bucket.time === slot)
+  const selectedBucket = buckets[selectedIndex]
   const totals = buckets.reduce((sum, bucket) => ({ upload: sum.upload + bucket.upload, download: sum.download + bucket.download }), { upload: 0, download: 0 })
   const today = calendarDate(new Date())
   const retention = snapshot.state.retentionDays
@@ -74,6 +78,10 @@ export default function TrafficHistory({ snapshot }: { snapshot: Snapshot }) {
   }
   function resetPosition() {
     setSlot(undefined)
+    setPage(1)
+  }
+  function selectSlot(time: number) {
+    setSlot(time)
     setPage(1)
   }
   function applyRange(next: Range) {
@@ -140,11 +148,36 @@ export default function TrafficHistory({ snapshot }: { snapshot: Snapshot }) {
         <div><dt>下载</dt><dd>{buckets.length ? bytes(totals.download) : '—'}</dd></div>
         <div><dt>合计</dt><dd>{buckets.length ? bytes(totals.upload + totals.download) : '—'}</dd></div>
       </dl>
-      <TrafficChart points={buckets} label={`1 ${granularities[range.granularity]}`} emptyLabel={emptyLabel} window={history?.value} formatTick={formatTime}/>
+      <TrafficChart points={buckets} label={`1 ${granularities[range.granularity]}`} emptyLabel={emptyLabel} timeWindow={history?.value}
+        formatTick={formatTime} formatDayTick={range.granularity === 'day' ? value => dayTicks.format(value * 1000) : undefined}
+        selected={slot} onSelect={selectSlot}/>
       <div className="chart-foot">
         <span><i className="legend up"/>上传<i className="legend down"/>下载 · 按{granularities[range.granularity]}汇总</span>
         {firstRecorded && history?.value && firstRecorded > history.value.from ? <span>最早记录 {formatTime(firstRecorded)}</span> : null}
       </div>
+      {selectedBucket && <div className="traffic-selection" role="region" aria-label="所选时段流量明细">
+        <div aria-live="polite">
+          <h3>{formatTime(selectedBucket.time)}</h3>
+          <dl>
+            <div><dt>上传</dt><dd>{bytes(selectedBucket.upload)}</dd></div>
+            <div><dt>下载</dt><dd>{bytes(selectedBucket.download)}</dd></div>
+            <div><dt>合计</dt><dd>{bytes(selectedBucket.upload + selectedBucket.download)}</dd></div>
+          </dl>
+        </div>
+        <div className="traffic-controls">
+          <button className="icon-button" type="button" aria-label="上一个有记录的时段" disabled={selectedIndex <= 0}
+            onClick={() => selectSlot(buckets[selectedIndex - 1].time)}><ChevronLeft size={16}/></button>
+          <button className="icon-button" type="button" aria-label="下一个有记录的时段" disabled={selectedIndex === buckets.length - 1}
+            onClick={() => selectSlot(buckets[selectedIndex + 1].time)}><ChevronRight size={16}/></button>
+          {range.granularity === 'day' && <Button onClick={() => {
+            const day = calendarDate(new Date(selectedBucket.time * 1000))
+            const next: Range = { from: day, to: day, granularity: 'hour' }
+            setDraft(next)
+            applyRange(next)
+          }}>当天小时明细</Button>}
+          <button className="icon-button" type="button" aria-label="清除时段选择" onClick={resetPosition}><X size={16}/></button>
+        </div>
+      </div>}
     </section>
 
     <section className="surface">
@@ -167,8 +200,8 @@ export default function TrafficHistory({ snapshot }: { snapshot: Snapshot }) {
 
     <TimelineTable key={`${search}:${revision}`} buckets={buckets} emptyLabel={emptyLabel} filename={`prismflow-traffic-${range.from}-${range.to}.csv`}
       formatTime={formatTime} slot={slot} onSelect={time => {
-        setSlot(slot === time ? undefined : time)
-        setPage(1)
+        if (slot === time) resetPosition()
+        else selectSlot(time)
         rankingHeading.current?.focus()
       }}/>
   </div>
