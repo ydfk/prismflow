@@ -7,6 +7,20 @@ import (
 	_ "time/tzdata"
 )
 
+const DefaultTrafficHistoryMiB = 256
+
+type TrafficHistoryPolicy struct {
+	Days, LimitMiB int
+}
+
+func (s State) HistoryPolicy() TrafficHistoryPolicy {
+	limit := s.HistoryLimitMiB
+	if limit == 0 {
+		limit = DefaultTrafficHistoryMiB
+	}
+	return TrafficHistoryPolicy{Days: s.RetentionDays, LimitMiB: limit}
+}
+
 func (t TrafficSettings) Normalized() TrafficSettings {
 	if t.ResetDay == 0 {
 		t.ResetDay = 1

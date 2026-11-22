@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Activity, ArrowDownLeft, ArrowUpRight } from 'lucide-react'
+import { Activity, ArrowDownLeft, ArrowRight, ArrowUpRight } from 'lucide-react'
 import { api, bytes } from '../api'
 import type { Point, Snapshot } from '../types'
 import { Notice } from '../ui'
@@ -13,7 +13,7 @@ const ranges = {
 type Range = keyof typeof ranges
 type Totals = Pick<Point, 'upload' | 'download'>
 const emptyPoints: Point[] = []
-const protocolName = (name: string) => name === 'unknown' ? '未识别协议' : name.toUpperCase()
+export const protocolName = (name: string) => name === 'unknown' ? '未识别协议' : name.toUpperCase()
 const amount = (value?: number) => value === undefined ? '—' : bytes(value)
 const totalBytes = (counts?: Totals) => counts ? counts.upload + counts.download : 0
 const percent = new Intl.NumberFormat('zh-CN', { style: 'percent', maximumFractionDigits: 1 })
@@ -91,7 +91,7 @@ export function useTrafficOverview(snapshot: Snapshot) {
 }
 type TrafficOverviewState = ReturnType<typeof useTrafficOverview>
 
-export function TrafficTrend({ traffic }: { traffic: TrafficOverviewState }) {
+export function TrafficTrend({ traffic, onHistory }: { traffic: TrafficOverviewState; onHistory: () => void }) {
   const { range, setRange, selection, setProtocol, result, totals, protocols, currentSeries, connections, metrics } = traffic
   const rates = metrics.rates.find(point => point.protocol === selection)
   const sampledRate = metrics.rates.length > 0
@@ -109,6 +109,7 @@ export function TrafficTrend({ traffic }: { traffic: TrafficOverviewState }) {
         <select className="compact" aria-label="流量时间范围" value={range} onChange={event => setRange(event.target.value as Range)}>
           {Object.entries(ranges).map(([value, option]) => <option value={value} key={value}>{option.label}</option>)}
         </select>
+        <button type="button" className="text-button" onClick={onHistory}>查看历史<ArrowRight size={14}/></button>
       </div>
     </div>
     <div className="traffic-readings">
@@ -151,16 +152,23 @@ export function ProtocolUsage({ traffic }: { traffic: TrafficOverviewState }) {
   </section>
 }
 
-function TrafficChart({ points, step, label, emptyLabel }: { points: Point[]; step: number; label: string; emptyLabel: string }) {
+type ChartPoint = Totals & { time: number; end?: number }
+type ChartProps = {
+  points: ChartPoint[]; step?: number; label: string; emptyLabel: string
+  window?: { from: number; until: number }; formatTick?: (seconds: number) => string
+}
+
+export function TrafficChart({ points, step, label, emptyLabel, window, formatTick = seconds => chartDate.format(seconds * 1000) }: ChartProps) {
   if (!points.length) return <div className="traffic-chart traffic-empty"><div className="chart-placeholder">{emptyLabel}</div></div>
-  const first = points[0].time
-  const last = points[points.length - 1].time
+  const first = window?.from ?? points[0].time
+  const last = window?.until ?? points[points.length - 1].time
   const max = Math.max(...points.map(point => Math.max(point.upload, point.download)))
   const x = (time: number) => first === last ? 380 : 20 + (time - first) / (last - first) * 720
   const y = (value: number) => 158 - value / (max || 1) * 125
   function path(direction: keyof Totals) {
     return points.map((point, index) => {
-      const joined = index > 0 && point.time - points[index - 1].time === step
+      const previous = points[index - 1]
+      const joined = previous && (previous.end ?? previous.time + (step ?? 0)) === point.time
       const start = `${x(point.time)},${y(point[direction])}`
       return joined ? `L${start}` : `M${start}h0.1`
     }).join(' ')
@@ -173,6 +181,6 @@ function TrafficChart({ points, step, label, emptyLabel }: { points: Point[]; st
         <path d={path('download')} className="download-line"/><path d={path('upload')} className="upload-line"/>
       </svg>
     </div>
-    <div className="chart-ticks"><span>{chartDate.format(first * 1000)}</span>{first !== last && <span>{chartDate.format(last * 1000)}</span>}</div>
+    <div className="chart-ticks"><span>{formatTick(first)}</span>{first !== last && <span>{formatTick(last)}</span>}</div>
   </div>
 }

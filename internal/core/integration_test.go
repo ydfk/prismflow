@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bufio"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -17,7 +18,9 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"prismflow/internal/metrics"
 	"prismflow/internal/model"
+	"prismflow/internal/store"
 	"strings"
 	"testing"
 	"time"
@@ -140,7 +143,18 @@ func TestIntegrationFailedPublishRestoresListeners(t *testing.T) {
 
 func TestIntegrationProtocolRoundTrips(t *testing.T) {
 	binary := integrationBinary(t)
-	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = io.WriteString(w, "prismflow-roundtrip") }))
+	const response = "prismflow-roundtrip"
+	finishTraffic := make(chan struct{})
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, response)
+		if r.URL.Path == "/traffic-sample" {
+			w.(http.Flusher).Flush()
+			select {
+			case <-finishTraffic:
+			case <-r.Context().Done():
+			}
+		}
+	}))
 	defer target.Close()
 	handshake := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = io.WriteString(w, "handshake-site") }))
 	handshakeCert := testCert(t)
@@ -216,15 +230,51 @@ func TestIntegrationProtocolRoundTrips(t *testing.T) {
 			}
 			defer connection.Close()
 			_ = connection.SetDeadline(time.Now().Add(15 * time.Second))
-			_, err = fmt.Fprintf(connection, "GET %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n", target.URL, strings.TrimPrefix(target.URL, "http://"))
+			targetURL := target.URL
+			var collector *metrics.Collector
+			if combination == "vless/tcp" {
+				db, err := store.Open(t.TempDir())
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer db.DB.Close()
+				collector = &metrics.Collector{Store: db, Core: server, State: func() model.State { return s }}
+				collector.Sample(ctx)
+				targetURL += "/traffic-sample"
+			}
+			_, err = fmt.Fprintf(connection, "GET %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n", targetURL, strings.TrimPrefix(target.URL, "http://"))
 			if err != nil {
 				t.Fatal(err)
 			}
-			b, err := io.ReadAll(connection)
+			reader := bufio.NewReader(connection)
+			if collector != nil {
+				result, err := http.ReadResponse(reader, &http.Request{Method: http.MethodGet})
+				if err != nil {
+					t.Fatal(err)
+				}
+				reader = bufio.NewReader(result.Body)
+				body := make([]byte, len(response))
+				if _, err = io.ReadFull(reader, body); err != nil || string(body) != response {
+					t.Fatalf("流量测试响应错误：%q %v", body, err)
+				}
+				collector.Sample(ctx)
+				close(finishTraffic)
+				filter := metrics.HistoryFilter{
+					From: time.Now().Add(-time.Hour), Until: time.Now().Add(time.Minute),
+					IP: "127.0.0.1", Inbound: e.ID, Network: "tcp", Protocol: "vless",
+				}
+				usage, err := collector.UsageBreakdown(ctx, filter, "user", 0)
+				if err != nil || len(usage.Rows) != 1 || usage.Rows[0].Value != s.Users[0].ID ||
+					usage.Rows[0].Upload <= 0 || usage.Rows[0].Download < int64(len(response)) {
+					t.Fatalf("真实 VLESS 流量归因错误：%+v %v", usage, err)
+				}
+				return
+			}
+			b, err := io.ReadAll(reader)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !strings.Contains(string(b), "prismflow-roundtrip") {
+			if !strings.Contains(string(b), response) {
 				t.Fatalf("roundtrip failed for %s: %s", kind, string(b))
 			}
 		})

@@ -9,7 +9,7 @@ export default function Overview({ snapshot, navigate }: PageProps & { navigate:
   return <>
     <ResourceSummary snapshot={snapshot} navigate={navigate}/>
     <div className="overview-grid">
-      <TrafficTrend traffic={traffic}/>
+      <TrafficTrend traffic={traffic} onHistory={() => navigate('traffic')}/>
       <aside className="surface connection-settings">
         <div className="section-heading"><h2>连接设置</h2></div>
         <dl className="definition-list">

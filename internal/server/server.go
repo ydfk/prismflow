@@ -95,7 +95,14 @@ func New(ctx context.Context, o Options) (*Server, error) {
 	}
 	s.Core = core.NewManager(o.CoreBinary, filepath.Join(dir, "core"), o.Controller, secret)
 	s.Certificates = &certificates.Manager{Store: db, Home: filepath.Join(dir, "acmesh")}
-	s.Metrics = &metrics.Collector{Store: db, Core: s.Core, State: s.Applied}
+	s.Metrics = &metrics.Collector{
+		Store: db, Core: s.Core, State: s.Applied,
+		HistoryPolicy: func() model.TrafficHistoryPolicy {
+			s.mu.Lock()
+			defer s.mu.Unlock()
+			return s.state.HistoryPolicy()
+		},
+	}
 	s.Traffic = &hosttraffic.Monitor{Store: db, Settings: func() model.TrafficSettings { return s.State().Traffic }}
 	var admin adminAccount
 	if err = db.Get("admin", &admin); isMissing(err) {
@@ -211,6 +218,8 @@ func (s *Server) AdminHandler() http.Handler {
 	api.HandleFunc("GET /api/certificates/files", s.certificateFiles)
 	api.HandleFunc("GET /api/events", s.events)
 	api.HandleFunc("GET /api/metrics", s.history)
+	api.HandleFunc("GET /api/metrics/history", s.calendarHistory)
+	api.HandleFunc("GET /api/metrics/breakdown", s.trafficBreakdown)
 	api.HandleFunc("GET /api/access/config", s.accessConfig)
 	api.HandleFunc("POST /api/access/check", s.checkAccess)
 	api.HandleFunc("PUT /api/settings", s.settings)

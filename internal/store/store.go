@@ -14,8 +14,9 @@ import (
 )
 
 type Store struct {
-	DB  *sql.DB
-	key []byte
+	DB   *sql.DB
+	key  []byte
+	path string
 }
 
 func Open(dir string) (*Store, error) {
@@ -36,22 +37,52 @@ func Open(dir string) (*Store, error) {
 	if len(key) != 32 {
 		return nil, errors.New("master.key 长度错误")
 	}
-	db, err := sql.Open("sqlite", filepath.Join(dir, "prismflow.db"))
+	dbPath := filepath.Join(dir, "prismflow.db")
+	_, statErr := os.Stat(dbPath)
+	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, err
 	}
 	db.SetMaxOpenConns(1)
-	_, err = db.Exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;
+	if errors.Is(statErr, os.ErrNotExist) {
+		// 增量回收须在建表前开启，现有数据库可继续复用已释放的页。
+		if _, err = db.Exec("PRAGMA auto_vacuum=INCREMENTAL"); err != nil {
+			db.Close()
+			return nil, err
+		}
+	}
+	_, err = db.Exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; PRAGMA journal_size_limit=8388608;
  CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value BLOB NOT NULL);
  CREATE TABLE IF NOT EXISTS samples (time INTEGER NOT NULL, protocol TEXT NOT NULL, upload INTEGER NOT NULL, download INTEGER NOT NULL, PRIMARY KEY(time,protocol));
+ CREATE TABLE IF NOT EXISTS traffic_details (
+   time INTEGER NOT NULL, protocol TEXT NOT NULL, source_ip TEXT NOT NULL, inbound TEXT NOT NULL,
+   user_id TEXT NOT NULL, network TEXT NOT NULL, upload INTEGER NOT NULL, download INTEGER NOT NULL,
+   PRIMARY KEY(time,protocol,source_ip,inbound,user_id,network)
+ ) WITHOUT ROWID;
+ CREATE INDEX IF NOT EXISTS traffic_details_ip_time ON traffic_details(source_ip,time);
  CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY, time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, message TEXT NOT NULL);
  `)
 	if err != nil {
 		db.Close()
 		return nil, err
 	}
-	_ = os.Chmod(filepath.Join(dir, "prismflow.db"), 0600)
-	return &Store{db, key}, nil
+	_ = os.Chmod(dbPath, 0600)
+	return &Store{DB: db, key: key, path: dbPath}, nil
+}
+
+func (s *Store) FileBytes() (int64, error) {
+	main, err := os.Stat(s.path)
+	if err != nil {
+		return 0, err
+	}
+	wal, err := os.Stat(s.path + "-wal")
+	if errors.Is(err, os.ErrNotExist) {
+		return main.Size(), nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	return main.Size() + wal.Size(), nil
 }
 func (s *Store) Seal(plain []byte) ([]byte, error) {
 	block, err := aes.NewCipher(s.key)

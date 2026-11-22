@@ -13,6 +13,7 @@ import (
 
 func (s *Server) getState(w http.ResponseWriter, r *http.Request) {
 	state := s.State()
+	state.HistoryLimitMiB = state.HistoryPolicy().LimitMiB
 	applied := s.Applied()
 	for i := range state.Endpoints {
 		state.Endpoints[i].PrivateKey = ""
@@ -256,6 +257,7 @@ func (s *Server) settings(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		PublicURL            *string                `json:"publicUrl"`
 		RetentionDays        *int                   `json:"retentionDays"`
+		HistoryLimitMiB      *int                   `json:"historyLimitMiB"`
 		DefaultHost          *string                `json:"defaultHost"`
 		DefaultCertificateID *string                `json:"defaultCertificateId"`
 		ApplyHost            bool                   `json:"applyHost"`
@@ -271,6 +273,9 @@ func (s *Server) settings(w http.ResponseWriter, r *http.Request) {
 		}
 		if body.RetentionDays != nil {
 			st.RetentionDays = *body.RetentionDays
+		}
+		if body.HistoryLimitMiB != nil {
+			st.HistoryLimitMiB = *body.HistoryLimitMiB
 		}
 		if body.Access != nil {
 			st.Access = *body.Access

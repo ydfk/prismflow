@@ -95,7 +95,7 @@ func (s *Server) history(w http.ResponseWriter, r *http.Request) {
 		hours = 720
 		bucket = 7200
 	}
-	since := time.Now().Add(-time.Duration(hours) * time.Hour).Unix()
+	since := time.Now().Add(-time.Duration(hours) * time.Hour).Truncate(time.Minute).Unix()
 	if r.URL.Query().Get("bucket") != "auto" {
 		bucket = 300
 	}

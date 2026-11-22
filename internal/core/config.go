@@ -54,8 +54,11 @@ func Validate(s model.State, reserved []int) error {
 	if len(s.Endpoints) > 100 || len(s.Users) > 1000 {
 		return errors.New("最多支持 100 个入口和 1000 个订阅用户")
 	}
-	if s.RetentionDays < 1 || s.RetentionDays > 365 {
-		return errors.New("历史保留天数必须在 1–365 之间")
+	if s.RetentionDays < 0 || s.RetentionDays > 365 {
+		return errors.New("历史保留天数必须在 0–365 之间，0 表示不按天清理")
+	}
+	if limit := s.HistoryPolicy().LimitMiB; limit < 32 || limit > 4096 {
+		return errors.New("流量历史容量必须在 32–4096 MiB 之间")
 	}
 	if s.PublicURL != "" && !ValidPublicURL(s.PublicURL) {
 		return errors.New("订阅地址须为 HTTPS 根地址；仅本机可用 HTTP")

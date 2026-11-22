@@ -3,6 +3,7 @@ package metrics
 import (
 	"context"
 	"encoding/json"
+	"net/netip"
 	"prismflow/internal/model"
 	"prismflow/internal/store"
 	"sync"
@@ -25,6 +26,9 @@ type Connection struct {
 	Download int64  `json:"download"`
 	Metadata struct {
 		InboundName string `json:"inboundName"`
+		InboundUser string `json:"inboundUser"`
+		SourceIP    string `json:"sourceIP"`
+		Network     string `json:"network"`
 	} `json:"metadata"`
 }
 type Snapshot struct {
@@ -38,20 +42,24 @@ type Collector struct {
 		Running() bool
 		Request(context.Context, string, any) error
 	}
-	State       func() model.State
-	mu          sync.Mutex
-	last        map[string]Counts
-	totals      Counts
-	initialized bool
-	lastAt      time.Time
-	current     []Point
-	connections map[string]int
-	Online      bool
+	State         func() model.State
+	HistoryPolicy func() model.TrafficHistoryPolicy
+	mu            sync.Mutex
+	last          map[string]Counts
+	totals        Counts
+	initialized   bool
+	lastAt        time.Time
+	current       []Point
+	connections   map[string]int
+	Online        bool
+	writeFailed   bool
+	maintenance   historyMaintenance
 }
 
 func (c *Collector) Run(ctx context.Context) {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
+	c.Sample(ctx)
 	for {
 		select {
 		case <-ctx.Done():
@@ -67,14 +75,37 @@ func delta(now, old int64) int64 {
 	}
 	return now - old
 }
+
+func NormalizeIP(value string) string {
+	ip, err := netip.ParseAddr(value)
+	if err != nil {
+		return ""
+	}
+	return ip.WithZone("").Unmap().String()
+}
+
+type dimensions struct {
+	protocol, ip, inbound, user, network string
+}
+
 func (c *Collector) Sample(ctx context.Context) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	state := c.State()
+	policy := state.HistoryPolicy()
+	if c.HistoryPolicy != nil {
+		policy = c.HistoryPolicy()
+	}
+	c.maintainHistory(ctx, time.Now(), policy)
+
 	var snapshot Snapshot
-	if !c.Core.Running() || c.Core.Request(ctx, "/connections", &snapshot) != nil {
+	running := c.Core.Running()
+	if !running || c.Core.Request(ctx, "/connections", &snapshot) != nil {
 		c.Online = false
-		c.initialized = false
-		c.last = nil
+		if !running {
+			c.initialized = false
+			c.last = nil
+		}
 		c.current = nil
 		c.connections = nil
 		return
@@ -82,27 +113,47 @@ func (c *Collector) Sample(ctx context.Context) {
 	c.Online = true
 	now := time.Now()
 	timestamp := now.Unix()
-	state := c.State()
-	byName := map[string]string{}
+	byName := make(map[string]model.Endpoint, len(state.Endpoints))
 	for _, e := range state.Endpoints {
-		byName["pf-"+e.ID] = e.Protocol
+		byName["pf-"+e.ID] = e
+	}
+	users := make(map[string]bool, len(state.Users))
+	for _, user := range state.Users {
+		users[user.ID] = true
 	}
 	bucket := map[string]Counts{}
+	details := map[dimensions]Counts{}
 	next := map[string]Counts{}
 	connections := map[string]int{"total": len(snapshot.Connections)}
 	for _, conn := range snapshot.Connections {
 		current := Counts{conn.Upload, conn.Download}
 		next[conn.ID] = current
 		previous := c.last[conn.ID]
-		p := byName[conn.Metadata.InboundName]
+		entry := byName[conn.Metadata.InboundName]
+		p := entry.Protocol
 		if p == "" {
 			p = "unknown"
 		}
 		connections[p]++
+		up, down := delta(current.Upload, previous.Upload), delta(current.Download, previous.Download)
 		b := bucket[p]
-		b.Upload += delta(current.Upload, previous.Upload)
-		b.Download += delta(current.Download, previous.Download)
+		b.Upload += up
+		b.Download += down
 		bucket[p] = b
+		if up == 0 && down == 0 {
+			continue
+		}
+		key := dimensions{protocol: p, ip: NormalizeIP(conn.Metadata.SourceIP), inbound: entry.ID}
+		if !entry.Native && users[conn.Metadata.InboundUser] {
+			key.user = conn.Metadata.InboundUser
+		}
+		if network := conn.Metadata.Network; network == "tcp" || network == "udp" {
+			key.network = network
+		}
+		detail := details[key]
+		detail.Upload += up
+		detail.Download += down
+		details[key] = detail
 	}
 	c.connections = connections
 	current := Counts{snapshot.Upload, snapshot.Download}
@@ -114,28 +165,21 @@ func (c *Collector) Sample(ctx context.Context) {
 		return
 	}
 	bucket["total"] = Counts{delta(current.Upload, c.totals.Upload), delta(current.Download, c.totals.Download)}
-	c.totals = current
-	c.last = next
 	elapsed := now.Sub(c.lastAt).Seconds()
-	c.lastAt = now
-	c.current = []Point{}
-	tx, err := c.Store.DB.Begin()
-	if err != nil {
-		return
-	}
+	c.current = make([]Point, 0, len(bucket))
 	for protocol, v := range bucket {
 		c.current = append(c.current, Point{timestamp, protocol, int64(float64(v.Upload) / elapsed), int64(float64(v.Download) / elapsed)})
-		if _, err = tx.Exec("INSERT INTO samples(time,protocol,upload,download) VALUES(?,?,?,?) ON CONFLICT(time,protocol) DO UPDATE SET upload=upload+excluded.upload,download=download+excluded.download", timestamp, protocol, v.Upload, v.Download); err != nil {
-			_ = tx.Rollback()
-			return
-		}
 	}
-	_, err = tx.Exec("DELETE FROM samples WHERE time < ?", now.AddDate(0, 0, -state.RetentionDays).Unix())
-	if err != nil {
-		_ = tx.Rollback()
+	// 持久化成功后才推进计数基线，避免临时写入失败使长连接的增量丢失。
+	if err := c.saveMinute(ctx, now.Truncate(time.Minute).Unix(), bucket, details); err != nil {
+		c.writeFailed = true
 		return
 	}
-	_ = tx.Commit()
+	c.writeFailed = false
+	c.maintenance.writes += len(bucket) + len(details)
+	c.totals = current
+	c.last = next
+	c.lastAt = now
 }
 func (c *Collector) Summary() map[string]any {
 	c.mu.Lock()
@@ -144,7 +188,11 @@ func (c *Collector) Summary() map[string]any {
 	if points == nil || !c.Online {
 		points = []Point{}
 	}
-	return map[string]any{"online": c.Online, "rates": points, "activeConnections": c.connections, "sampledAt": c.lastAt, "intervalSeconds": 5, "protocolAccounting": "sampled-active-connections"}
+	return map[string]any{
+		"online": c.Online, "rates": points, "activeConnections": c.connections, "sampledAt": c.lastAt,
+		"intervalSeconds": 5, "protocolAccounting": "sampled-active-connections", "historyWriteFailed": c.writeFailed,
+		"historyStorage": c.maintenance.storage, "historyMaintenanceFailed": c.maintenance.failed,
+	}
 }
 func (c *Collector) History(since int64) ([]Point, error) {
 	return c.BucketedHistory(since, 300)

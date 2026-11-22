@@ -93,6 +93,7 @@ type State struct {
 	Website              Website         `json:"website"`
 	PublicURL            string          `json:"publicUrl"`
 	RetentionDays        int             `json:"retentionDays"`
+	HistoryLimitMiB      int             `json:"historyLimitMiB"`
 }
 
 func Default() State {

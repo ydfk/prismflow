@@ -16,7 +16,7 @@ export const fieldGuidance:Record<string,{placeholder?:string;help?:string}>={
  '传输方式':{help:'服务端与客户端传输参数需一致。QUIC 协议需要开放 UDP。'},
  '协议类型':{help:'常用协议支持表单与订阅，其他使用原生参数。TUN/Redirect/TProxy 还需要系统设备、路由和权限。'},
  '公开订阅地址':{placeholder:'https://connect.example.com',help:'公开 HTTPS 根地址应反代到公开服务（默认 8081），不要指向管理端。根路径是网站，/s/令牌 是订阅。'},
- '流量历史保留天数':{placeholder:'30',help:'代理图表采样保留 1–365 天。服务器本周期用量独立持久化，不受历史清理影响。'},
+ '流量历史保留天数':{placeholder:'30',help:'0 表示不按天清理，仍按容量淘汰最旧记录。服务器本周期用量独立保存。'},
  '备份密码':{placeholder:'至少 12 字节，请妥善保存',help:'恢复必须使用同一密码，无法找回。备份不含管理员密码与流量记录。'},
  '当前密码':{placeholder:'输入当前管理员密码'},'新密码':{placeholder:'12–72 字节的新密码'},'密码':{placeholder:'输入管理员密码'},'用户名':{placeholder:'admin'},'初始化令牌':{placeholder:'数据目录 setup.token 的内容'},
  '证书域名':{placeholder:'node.example.com'},'ACME 联系邮箱':{placeholder:'admin@example.com'},'证书 PEM':{placeholder:'-----BEGIN CERTIFICATE-----\n…'},'私钥 PEM':{placeholder:'-----BEGIN PRIVATE KEY-----\n…'},

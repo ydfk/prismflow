@@ -13,10 +13,37 @@
 .usage-table tbody tr:last-child th{border-bottom:0}
 .usage-table .text-button[aria-pressed="true"]{text-decoration:underline;text-underline-offset:4px}
 .usage-note{margin:10px 0 0;color:var(--muted);font-size:11px}
+
+.history-layout{display:grid;gap:14px}
+.history-layout>.surface{min-width:0}
+.history-heading{flex-wrap:wrap;gap:8px}
+.history-heading p{margin:4px 0 0}
+.history-heading h2:focus{outline:none}
+.history-presets,.history-applied-filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.history-filters{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,.85fr) minmax(0,1.4fr) auto;align-items:end;gap:10px}
+.history-filters .field{margin:0;min-width:0}
+.history-filters input,.history-filters select,.history-filters>.button{min-height:38px}
+.history-applied-filters{margin:10px 0 0}
+.history-applied-filters>.text-button{justify-content:flex-start;min-height:28px;max-width:100%;text-align:left;overflow-wrap:anywhere}
+.history-applied-filters svg{flex:none}
+.history-totals{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:16px 0 0;padding:12px 0;border-top:1px solid var(--line)}
+.history-totals dt{color:var(--muted);font-size:12px;margin-bottom:4px}
+.history-totals dd{margin:0;font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.history-table th:first-child button{white-space:normal;overflow-wrap:anywhere;text-align:left}
+.history-table td{white-space:nowrap}
+.history-empty{padding:24px 4px;color:var(--muted);font-size:13px;text-align:center}
+.history-pagination{display:flex;align-items:center;justify-content:flex-end;gap:9px;margin-top:10px;color:var(--muted);font-size:12px}
+
 @media(max-width:760px){
   .traffic-panel .traffic-readings{grid-template-columns:repeat(2,minmax(0,1fr))}
   .traffic-panel .traffic-readings strong{font-size:18px}
   .traffic-controls{max-width:100%}
   .usage-table th,.usage-table td{padding:8px 5px}
   .usage-table thead th{white-space:normal}
+  .history-layout{gap:10px}
+  .history-filters{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .history-filters>.button{grid-column:1/-1}
+  .history-totals dd{font-size:16px}
+  .history-table th:first-child{min-width:115px}
+  .history-pagination{justify-content:center}
 }

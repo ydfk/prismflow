@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
-import { Activity, Check, Layers3, LogOut, Menu, Moon, Palette, Radio, Settings2, ShieldCheck, Sun, Users, X } from 'lucide-react'
+import { Activity, ChartNoAxesCombined, Check, Layers3, LogOut, Menu, Moon, Palette, Radio, Settings2, ShieldCheck, Sun, Users, X } from 'lucide-react'
 import { api } from './api'
 import type { Page, Snapshot } from './types'
 import { Notice } from './ui'
@@ -12,8 +12,10 @@ const UserPage = lazy(() => import('./pages/Users'))
 const Certificates = lazy(() => import('./pages/Certificates'))
 
 const Settings = lazy(() => import('./pages/Settings'))
+const TrafficHistory = lazy(() => import('./pages/TrafficHistory'))
 const navigation = [
  { id:'overview',name:'总览',icon:Activity,description:'服务器的每一次连接，尽在掌握。' },
+ { id:'traffic',name:'流量统计',icon:ChartNoAxesCombined,description:'按时间和来源追踪代理上传与下载。' },
  { id:'endpoints',name:'协议入口',icon:Layers3,description:'选好组合，几步完成部署。' },
  { id:'users',name:'用户与订阅',icon:Users,description:'为每位用户，自由选择连接方式。' },
  { id:'certificates',name:'域名与证书',icon:ShieldCheck,description:'系统证书与自动签发，按需选择。' },
@@ -49,7 +51,7 @@ export default function App() {
   {menu&&mobile&&<button className="mobile-scrim" tabIndex={-1} aria-label="收起导航" onClick={()=>setMenu(false)}/>}
   <div className="main-shell" inert={mobile&&menu}><main id="main"><div className="page-heading"><div><h1>{current.name}</h1><p>{current.description}</p></div><span className="save-status"><Check size={14}/>{snapshot.core.available?'保存即生效':'配置已保存 · 等待内核'}</span></div>
    {error&&<Notice error>{error}</Notice>}{!snapshot.core.available&&<Notice>尚未安装 Mihomo。前往「系统设置」点击下载内核；安装完成后自动启用已保存的配置。</Notice>}
-   <Suspense fallback={<div className="surface empty">正在加载…</div>}>{page==='overview'&&<Overview {...props} navigate={navigate}/>} {page==='endpoints'&&<Endpoints {...props} navigate={navigate}/>} {page==='users'&&<UserPage {...props}/>} {page==='certificates'&&<Certificates {...props}/>} {page==='settings'&&<Settings {...props}/>}</Suspense>
+   <Suspense fallback={<div className="surface empty">正在加载…</div>}>{page==='overview'&&<Overview {...props} navigate={navigate}/>} {page==='traffic'&&<TrafficHistory snapshot={snapshot}/>} {page==='endpoints'&&<Endpoints {...props} navigate={navigate}/>} {page==='users'&&<UserPage {...props}/>} {page==='certificates'&&<Certificates {...props}/>} {page==='settings'&&<Settings {...props}/>}</Suspense>
    <footer className="page-footer"><span>PrismFlow · 棱流</span><span>Mihomo {snapshot.core.targetVersion} · 单服务器</span></footer>
   </main></div>{appearance&&<Appearance onClose={()=>setAppearance(false)}/>} {toast&&<div className="toast" role="status"><Check size={17}/>{toast}</div>}
  </div>

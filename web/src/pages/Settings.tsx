@@ -5,6 +5,7 @@ import KernelPanel from './KernelPanel'
 import UpdatePanel from './UpdatePanel'
 import Website from './Website'
 import TrafficSettings from './TrafficSettings'
+import HistoryStorageSettings from './HistoryStorageSettings'
 import SettingsBackup from './SettingsBackup'
 import PasskeySettings from './PasskeySettings'
 import type { PageProps } from '../types'
@@ -21,7 +22,6 @@ type Section=typeof sections[number]['id']
 export default function Settings({snapshot,refresh,notify}:PageProps){
  const prefix=useId()
  const [section,setSection]=useState<Section>('service')
- const [retention,setRetention]=useState(snapshot.state.retentionDays)
  const [events,setEvents]=useState<{time:string;message:string}[]>([])
  const [error,setError]=useState('')
  const [current,setCurrent]=useState('')
@@ -50,7 +50,7 @@ export default function Settings({snapshot,refresh,notify}:PageProps){
   </div>
   <div className="settings-panel settings-traffic" id={`${prefix}-panel-traffic`} role="tabpanel" aria-labelledby={`${prefix}-tab-traffic`} hidden={section!=='traffic'}>
    <TrafficSettings snapshot={snapshot} refresh={refresh} notify={notify}/>
-   <div className="settings-column"><section className="surface"><div className="section-heading"><h2>历史记录</h2></div><AsyncForm label="保存历史设置" submit={async()=>{await api('/settings','PUT',{retentionDays:retention});await refresh();notify('历史记录设置已保存')}}><Field label="流量历史保留天数"><input type="number" min={1} max={365} value={retention} onChange={e=>setRetention(Number(e.target.value))}/></Field></AsyncForm></section>
+   <div className="settings-column"><HistoryStorageSettings snapshot={snapshot} refresh={refresh} notify={notify}/>
     <section className="surface"><div className="section-heading"><h2>运行事件</h2><span className="subtle">最近 100 条</span></div><div className="event-list">{events.length?events.map((event,index)=><div key={`${event.time}-${index}`}><span>{event.message}</span><time>{event.time} UTC</time></div>):<p>暂无事件记录</p>}</div></section>
    </div>
   </div>

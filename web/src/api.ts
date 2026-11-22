@@ -1,9 +1,9 @@
 let csrf = ''
-export async function request(path: string, method = 'GET', body?: unknown): Promise<Response> {
+export async function request(path: string, method = 'GET', body?: unknown, signal?: AbortSignal): Promise<Response> {
   const headers: Record<string, string> = {}
   if (method !== 'GET') headers['X-CSRF-Token'] = csrf
   if (body !== undefined && !(body instanceof Blob)) headers['Content-Type'] = 'application/json'
-  const response = await fetch(new URL(`api${path}`, document.baseURI), { method, headers, credentials: 'same-origin', body: body instanceof Blob ? body : body === undefined ? undefined : JSON.stringify(body) })
+  const response = await fetch(new URL(`api${path}`, document.baseURI), { method, headers, signal, credentials: 'same-origin', body: body instanceof Blob ? body : body === undefined ? undefined : JSON.stringify(body) })
   csrf = response.headers.get('X-CSRF-Token') || csrf
   if (!response.ok) {
     const failure = await response.json().catch(() => ({ error: `请求失败（${response.status}）` }))
@@ -12,8 +12,8 @@ export async function request(path: string, method = 'GET', body?: unknown): Pro
   }
   return response
 }
-export async function api<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
-  const response = await request(path, method, body)
+export async function api<T>(path: string, method = 'GET', body?: unknown, signal?: AbortSignal): Promise<T> {
+  const response = await request(path, method, body, signal)
   const result = await response.json()
   if (result.csrf) csrf = result.csrf
   return result as T
