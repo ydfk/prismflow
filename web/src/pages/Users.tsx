@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { Copy, KeyRound, Link2, Pencil, Plus, QrCode, Trash2 } from 'lucide-react'
-import { api, copy, date } from '../api'
-import Modal from '../Modal'
+import { KeyRound, Link2, Pencil, Plus, QrCode, Trash2 } from 'lucide-react'
+import { api, date } from '../api'
 import ConfirmDialog from '../ConfirmDialog'
 import type { PageProps, User } from '../types'
-import { AsyncForm, Badge, Button, Editor, Empty, Field, Notice } from '../ui'
+import { AsyncForm, Badge, Button, Editor, Empty, Field } from '../ui'
+import SubscriptionDialog from './SubscriptionDialog'
 
 type EditUser = Pick<User, 'name' | 'enabled' | 'endpointIds'> & { id?: string }
 const confirmations = {
@@ -15,23 +15,21 @@ const confirmations = {
 type UserAction = keyof typeof confirmations
 
 export default function Users({ snapshot, refresh, notify }: PageProps) {
-  const [confirming,setConfirming]=useState<{user:User;action:UserAction}>();const [editing, setEditing] = useState<EditUser>(); const [error, setError] = useState(''); const [share, setShare] = useState<{ name: string; url: string; links: string; linksUrl: string; qr: string }>(); const [search, setSearch] = useState('')
+  const [confirming,setConfirming]=useState<{user:User;action:UserAction}>();const [editing, setEditing] = useState<EditUser>(); const [sharing, setSharing] = useState<User>(); const [search, setSearch] = useState('')
   async function confirmAction(user: User, action: UserAction) {
     const path = `/users/${user.id}`
     if (action === 'delete') await api(path, 'DELETE')
     else await api(`${path}/rotate`, 'POST', { credentials: action === 'credentials' })
-    setShare(undefined)
+    setSharing(undefined)
     await refresh()
     notify(action === 'delete' ? '用户已删除' : '重置成功')
   }
-  async function showShare(u: User) { setError(''); try { const result = await api<{ url: string; links: string; linksUrl: string }>(`/users/${u.id}/subscription`); const QRCode = await import('qrcode'); const qr = await QRCode.toDataURL(result.url, { width: 220, margin: 2, color: { dark: '#143c36', light: '#ffffff' } }); setShare({ ...result, name: u.name, qr }) } catch (e) { setError((e as Error).message) } }
-  async function copyText(text: string) { try { await copy(text); notify('已复制') } catch (e) { setError((e as Error).message) } }
   const users = snapshot.state.users.filter(u => u.name.toLowerCase().includes(search.toLowerCase()))
-  return <>{confirming&&<ConfirmDialog title={confirmations[confirming.action].title} message={`用户「${confirming.user.name}」。${confirmations[confirming.action].message}`} confirmLabel={confirmations[confirming.action].label} onClose={() => setConfirming(undefined)} onConfirm={() => confirmAction(confirming.user, confirming.action)}/>}{error && <Notice error>{error}</Notice>}<div className="toolbar"><input className="search" aria-label="搜索用户" placeholder="搜索用户…" value={search} onChange={e => setSearch(e.target.value)}/><Button className="primary" onClick={() => setEditing({ name: '', enabled: true, endpointIds: snapshot.state.endpoints.filter(e => e.enabled && !e.native).map(e => e.id) })}><Plus size={17}/>添加用户</Button></div>
+  return <>{confirming&&<ConfirmDialog title={confirmations[confirming.action].title} message={`用户「${confirming.user.name}」。${confirmations[confirming.action].message}`} confirmLabel={confirmations[confirming.action].label} onClose={() => setConfirming(undefined)} onConfirm={() => confirmAction(confirming.user, confirming.action)}/>}<div className="toolbar"><input className="search" aria-label="搜索用户" placeholder="搜索用户…" value={search} onChange={e => setSearch(e.target.value)}/><Button className="primary" onClick={() => setEditing({ name: '', enabled: true, endpointIds: snapshot.state.endpoints.filter(e => e.enabled && !e.native).map(e => e.id) })}><Plus size={17}/>添加用户</Button></div>
     {editing && <Editor title={editing.id ? '编辑用户' : '添加用户'} onClose={() => setEditing(undefined)}><AsyncForm submit={async () => { const { name, enabled, endpointIds } = editing; await api(`/users${editing.id ? `/${editing.id}` : ''}`, editing.id ? 'PUT' : 'POST', { name, enabled, endpointIds }); await refresh(); notify('用户与所选协议已自动生效'); setEditing(undefined) }}><Field label="用户名称"><input required maxLength={100} value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} placeholder="例如：我的手机"/></Field><fieldset className="assignment"><legend>自由选择可用协议</legend><div className="selection-tools"><button type="button" className="text-button" onClick={()=>setEditing({...editing,endpointIds:snapshot.state.endpoints.filter(e=>!e.native).map(e=>e.id)})}>全选</button><button type="button" className="text-button" onClick={()=>setEditing({...editing,endpointIds:[]})}>清空</button></div>{snapshot.state.endpoints.some(e=>!e.native) ? snapshot.state.endpoints.filter(e=>!e.native).map(endpoint => <label key={endpoint.id}><input type="checkbox" checked={editing.endpointIds.includes(endpoint.id)} onChange={e => setEditing({ ...editing, endpointIds: e.target.checked ? [...editing.endpointIds, endpoint.id] : editing.endpointIds.filter(id => id !== endpoint.id) })}/><span>{endpoint.name}<small>{endpoint.protocol.toUpperCase()} · {endpoint.port}</small></span></label>) : <p>先创建一个协议入口，再分配给用户。</p>}</fieldset><div className="checks"><label><input type="checkbox" checked={editing.enabled} onChange={e => setEditing({ ...editing, enabled: e.target.checked })}/>启用用户</label></div></AsyncForm></Editor>}
-    {share && <Modal title={`${share.name} 的订阅`} onClose={()=>setShare(undefined)} wide><section className="share-panel"><div className="section-heading"><h2>{share.name} 的订阅</h2></div><div className="share-content"><img src={share.qr} alt={`${share.name} 的订阅二维码`}/><div><Field label="Mihomo / Clash Meta 订阅"><div className="input-action"><input readOnly value={share.url} onFocus={e => e.target.select()}/><Button onClick={() => copyText(share.url)} aria-label="复制订阅链接"><Copy size={16}/></Button></div></Field><Field label="通用节点链接订阅"><div className="input-action"><input readOnly value={share.linksUrl} onFocus={e => e.target.select()}/><Button onClick={() => copyText(share.linksUrl)} aria-label="复制通用订阅链接"><Copy size={16}/></Button></div></Field><details><summary>查看节点分享链接</summary><textarea readOnly rows={5} value={share.links}/><Button onClick={() => copyText(share.links)}><Copy size={16}/>复制所有节点</Button></details></div></div><p className="footnote">订阅链接包含访问凭据，请仅分享给对应用户。显示的是当前已生效的节点配置。</p></section></Modal>}
+    {sharing && <SubscriptionDialog key={sharing.id} user={sharing} notify={notify} onClose={() => setSharing(undefined)}/>}
     <section className="surface table-surface">{users.length ? <div className="table-scroll"><table><thead><tr><th>用户</th><th>可用入口</th><th>创建日期</th><th>状态</th><th>操作</th></tr></thead><tbody>{users.map(u => <tr key={u.id}><td><strong>{u.name}</strong></td><td>{u.endpointIds.length} 个入口</td><td>{date(u.createdAt)}</td><td><Badge active={u.enabled}>{u.enabled ? '可用' : '停用'}</Badge></td><td><div className="row-actions" role="group" aria-label={`${u.name} 的操作`}>
-      <button type="button" className="icon-button" aria-label="订阅" title="查看订阅链接和二维码" onClick={() => showShare(u)}><QrCode size={16}/></button>
+      <button type="button" className="icon-button" aria-label="订阅" title="查看订阅链接和二维码" onClick={() => setSharing(u)}><QrCode size={16}/></button>
       <button type="button" className="icon-button" aria-label={`编辑 ${u.name}`} title="编辑用户资料和协议分配" onClick={() => setEditing({ id: u.id, name: u.name, enabled: u.enabled, endpointIds: u.endpointIds })}><Pencil size={16}/></button>
       <button type="button" className="icon-button" aria-label="重置订阅" title="重置订阅链接，保留节点凭据" onClick={() => setConfirming({ user: u, action: 'subscription' })}><Link2 size={16}/></button>
       <button type="button" className="icon-button" aria-label={`重置 ${u.name} 凭据`} title="重置订阅链接和用户节点凭据" onClick={() => setConfirming({ user: u, action: 'credentials' })}><KeyRound size={16}/></button>

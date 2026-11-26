@@ -1,6 +1,7 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Locator, type Page } from '@playwright/test'
 import { readFile, mkdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
+import QRCode from 'qrcode'
 const password='PrismFlow-E2E-password-123'
 async function login(page:Page){
  await page.goto('/');await page.getByLabel('用户名',{exact:true}).fill('admin');await page.getByLabel('密码',{exact:true}).fill(password)
@@ -8,6 +9,26 @@ async function login(page:Page){
  await page.getByRole('button',{name:/创建管理员并登录|登录工作台/}).click();await expect(page.getByRole('heading',{name:'总览',exact:true})).toBeVisible()
 }
 async function seedCertificate(page:Page){const state=await page.request.get('/api/state');const dir=await readFile(resolve('../.cache/e2e-path.txt'),'utf8');const fixture=JSON.parse(await readFile(resolve(dir,'certificate-fixture.json'),'utf8'));const result=await page.request.post('/api/certificates/import',{headers:{'X-CSRF-Token':state.headers()['x-csrf-token']},data:fixture});expect(result.status()).toBe(200)}
+async function expectSubscriptionCode(code: Locator, url: string) {
+  const { size, data } = QRCode.create(url).modules
+  await expect(code).toBeVisible()
+  const matches = await code.evaluate(async (element, expected) => {
+    const image = element as HTMLImageElement
+    await image.decode()
+    const canvas = document.createElement('canvas')
+    canvas.width = canvas.height = image.naturalWidth
+    const context = canvas.getContext('2d')!
+    context.drawImage(image, 0, 0)
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data
+    const scale = canvas.width / (expected.size + 8)
+    return expected.modules.every((module, index) => {
+      const x = Math.floor((index % expected.size + 4.5) * scale)
+      const y = Math.floor((Math.floor(index / expected.size) + 4.5) * scale)
+      return (pixels[(y * canvas.width + x) * 4] < 128) === Boolean(module)
+    })
+  }, { size, modules: Array.from(data) })
+  expect(matches).toBe(true)
+}
 test.describe.configure({mode:'serial'})
 test('单项转普通创建、批量快速创建与用户订阅',async({page})=>{
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await login(page);await seedCertificate(page)
@@ -32,7 +53,22 @@ test('单项转普通创建、批量快速创建与用户订阅',async({page})=>
  await page.getByRole('button',{name:'编辑 Mixed 本地',exact:true}).click();modal=page.getByRole('dialog',{name:'编辑协议',exact:true});await expect(modal.getByLabel('原生监听器参数（YAML / JSON）',{exact:true})).toContainText('e2e-native-secret');const before=(await (await page.request.get('/api/state')).json()).state.revision;await modal.getByLabel('原生监听器参数（YAML / JSON）',{exact:true}).fill('users: wrong');await modal.getByRole('button',{name:'保存配置',exact:true}).click();await expect(modal.getByRole('alert')).toContainText('Mihomo 配置校验失败');const rejected=await (await page.request.get('/api/state')).json();expect(rejected.state.revision).toBe(before);expect(rejected.core.running).toBe(true);await page.keyboard.press('Escape')
  const state=await page.request.get('/api/state');expect(await state.text()).not.toContain('e2e-native-secret')
  await page.getByRole('button',{name:'域名与证书',exact:true}).click();await page.getByLabel('统一访问地址',{exact:true}).fill('http://127.0.0.1:18881');await page.getByRole('button',{name:'保存访问设置',exact:true}).click()
- await page.getByRole('button',{name:'用户与订阅',exact:true}).click();await page.getByRole('button',{name:'订阅',exact:true}).click();const link=await page.getByLabel('Mihomo / Clash Meta 订阅',{exact:true}).inputValue();const sub=await page.request.get(link);expect(sub.status()).toBe(200);const yaml=await sub.text();expect(yaml).toContain('network: xhttp');expect(yaml).toContain('/e2e-xhttp');expect(yaml).not.toContain('Mixed 本地');await expect(page.getByAltText('测试设备 的订阅二维码')).toBeVisible();await expect(page.getByRole('dialog',{name:'测试设备 的订阅',exact:true})).toBeVisible();expect(yaml).toContain('测试设备 · XHTTP 自定义');expect(sub.headers()['subscription-userinfo']).toContain('upload=');await page.keyboard.press('Escape')
+ await page.getByRole('button',{name:'用户与订阅',exact:true}).click()
+ await page.getByRole('button',{name:'订阅',exact:true}).click()
+ const subscription=page.getByRole('dialog',{name:'测试设备 的订阅',exact:true})
+ const link=await subscription.getByLabel('Mihomo / Clash Meta 订阅',{exact:true}).inputValue()
+ const universalLink=await subscription.getByLabel('通用节点链接订阅',{exact:true}).inputValue()
+ expect(new URL(universalLink).searchParams.get('format')).toBe('links')
+ await Promise.all([
+   expectSubscriptionCode(subscription.getByAltText('Clash / Mihomo 订阅二维码'),link),
+   expectSubscriptionCode(subscription.getByAltText('通用订阅二维码'),universalLink),
+ ])
+ const sub=await page.request.get(link);expect(sub.status()).toBe(200);const yaml=await sub.text();expect(yaml).toContain('network: xhttp');expect(yaml).toContain('/e2e-xhttp');expect(yaml).not.toContain('Mixed 本地');expect(yaml).toContain('测试设备 · XHTTP 自定义');expect(sub.headers()['subscription-userinfo']).toContain('upload=')
+ const mobileViewport=page.viewportSize()!
+ await page.setViewportSize({width:390,height:844})
+ expect(await subscription.evaluate(dialog=>dialog.scrollWidth<=dialog.clientWidth)).toBe(true)
+ await page.setViewportSize(mobileViewport)
+ await page.keyboard.press('Escape')
  await page.getByRole('button',{name:'编辑 测试设备',exact:true}).click();await expect(page.getByRole('dialog').getByText('Mixed 本地',{exact:true})).toHaveCount(0);await page.getByRole('button',{name:'清空',exact:true}).click();await page.getByRole('dialog').getByRole('button',{name:'保存配置',exact:true}).click();await expect(page.getByRole('cell',{name:'0 个入口',exact:true})).toBeVisible()
  await page.getByRole('button',{name:'编辑 测试设备',exact:true}).click();await page.getByRole('button',{name:'全选',exact:true}).click();await page.getByRole('dialog').getByRole('button',{name:'保存配置',exact:true}).click();await expect(page.getByRole('cell',{name:'3 个入口',exact:true})).toBeVisible();expect(errors).toEqual([])
 })
